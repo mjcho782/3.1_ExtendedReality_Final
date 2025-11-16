@@ -84,8 +84,8 @@
       </a-assets>
 
       <!-- Camera + cursor -->
-      <a-entity id="rig" position="0 1.6 0">
-        <a-camera>
+      <a-entity id="rig" position="0 0 0">
+        <a-camera position="0 1.6 0">
           <a-entity 
             cursor="fuse: false"
             raycaster="objects: .clickable"
@@ -95,6 +95,7 @@
           </a-entity>
         </a-camera>
       </a-entity>
+      
 
       <!-- ⭐ WORLD-ANCHORED INTRO PANEL (won’t move with camera) -->
       <a-entity id="intro-panel" position="0 1.6 -2">
@@ -104,7 +105,7 @@
           height="1.1"
           material="src: #intro1; transparent: true; side: double">
         </a-plane>
-
+      
         <a-plane
           id="intro-button-3d"
           class="clickable"
@@ -115,16 +116,18 @@
           text="value: Next; align: center; color: #FFFFFF; width: 2">
         </a-plane>
       </a-entity>
+      
 
       <!-- Your box -->
       <a-box 
-        position="0 1.3 -1" 
+        position="0 1.4 -1"
         width="0.5" 
         height="0.5" 
         depth="0.5"
         material="color: #4CC3D9; opacity: 1.0;"
         rotation="0 45 0">
       </a-box>
+
 
       <a-entity hand-tracking-controls="hand: left"></a-entity>
       <a-entity hand-tracking-controls="hand: right"></a-entity>
