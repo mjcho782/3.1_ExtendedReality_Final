@@ -24,7 +24,10 @@
     <script type="module" src="/main.js"></script>
   </head>
   <body>
-    <a-scene environment>
+    <a-scene 
+      xr-mode="immersive-ar"
+      background="transparent"
+      renderer="colorManagement: true; sortObjects: true">
       <a-entity hand-tracking-controls="hand: left"></a-entity>
       <a-entity hand-tracking-controls="hand: right"></a-entity>
     </a-scene>
