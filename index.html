@@ -3,9 +3,11 @@
   <head>
     <meta charset="utf-8">
     <title>Hand Tracking! • A-Frame</title>
-    <meta name="description" content="Hand Tracking! • A-Frame">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <!-- A-Frame CSS -->
+
+    <!-- A-Frame -->
+    <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
+
     <style>
       * {
         margin: 0;
@@ -13,7 +15,7 @@
         box-sizing: border-box;
       }
       body {
-        font-family: 'Arial', sans-serif;
+        font-family: Arial, sans-serif;
         overflow: hidden;
       }
       a-scene {
@@ -21,15 +23,18 @@
         height: 100vh;
       }
     </style>
+
+    <!-- Your own game logic; if this imports aframe, keep it, otherwise just load after aframe -->
     <script type="module" src="/main.js"></script>
   </head>
   <body>
     <a-scene
       renderer="antialias: true; colorManagement: true; sortObjects: true"
       webxr="requiredFeatures: local-floor; optionalFeatures: hand-tracking">
+
       <a-entity hand-tracking-controls="hand: left"></a-entity>
       <a-entity hand-tracking-controls="hand: right"></a-entity>
+
     </a-scene>
   </body>
-  
 </html>
