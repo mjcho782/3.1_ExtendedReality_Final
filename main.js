@@ -5,10 +5,10 @@ import 'aframe';
 
 // 1.5) Import intro images so Vite includes them in the build
 // Put intro1.png, intro2.png, intro3.png, intro4.png in the same folder as main.js
-import intro1 from './images/intro1.png';
-import intro2 from './images/intro2.png';
-import intro3 from './images/intro3.png';
-import intro4 from './images/intro4.png';
+import intro1 from '/images/intro1.png';
+import intro2 from '/images/intro2.png';
+import intro3 from '/images/intro3.png';
+import intro4 from '/images/intro4.png';
 
 // 2) WebXR AR configuration with automatic AR mode request
 document.addEventListener('DOMContentLoaded', () => {
