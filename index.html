@@ -25,9 +25,10 @@
   </head>
   <body>
     <a-scene 
-      xr-mode="immersive-ar"
       background="transparent"
-      renderer="colorManagement: true; sortObjects: true">
+      renderer="colorManagement: true; sortObjects: true; alpha: true"
+      webxr="referenceSpaceType: local-floor; requiredFeatures: local-floor; optionalFeatures: hand-tracking, hit-test"
+      vr-mode-ui="enabled: true">
       <a-entity hand-tracking-controls="hand: left"></a-entity>
       <a-entity hand-tracking-controls="hand: right"></a-entity>
     </a-scene>
