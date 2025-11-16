@@ -75,7 +75,7 @@
       webxr="referenceSpaceType: local-floor; requiredFeatures: local-floor; optionalFeatures: hand-tracking, hit-test"
       vr-mode-ui="enabled: true">
 
-      <!-- 1) Assets (REQUIRED) -->
+      <!-- Assets -->
       <a-assets>
         <img id="intro1" src="/images/intro1.png">
         <img id="intro2" src="/images/intro2.png">
@@ -83,8 +83,7 @@
         <img id="intro4" src="/images/intro4.png">
       </a-assets>
 
-      <!-- 2) Camera + cursor so we can click in VR/AR -->
-      <!-- 2) Camera + cursor so we can click in VR/AR -->
+      <!-- Camera + cursor -->
       <a-entity id="rig" position="0 1.6 0">
         <a-camera>
           <a-entity 
@@ -94,31 +93,30 @@
             geometry="primitive: ring; radiusInner: 0.01; radiusOuter: 0.015"
             material="color: white; shader: flat">
           </a-entity>
-
-          <!-- ⭐ Move INTRO PANEL inside the camera so it stays eye-level -->
-          <a-entity id="intro-panel" position="0 0 -2">
-            <a-plane
-              id="intro-image-3d"
-              width="1.8"
-              height="1.1"
-              material="src: #intro1; transparent: true; side: double">
-            </a-plane>
-
-            <a-plane
-              id="intro-button-3d"
-              class="clickable"
-              position="0 -0.9 0.01"
-              width="0.9"
-              height="0.3"
-              material="color: #2196F3"
-              text="value: Next; align: center; color: #FFFFFF; width: 2">
-            </a-plane>
-          </a-entity>
         </a-camera>
       </a-entity>
 
+      <!-- ⭐ WORLD-ANCHORED INTRO PANEL (won’t move with camera) -->
+      <a-entity id="intro-panel" position="0 1.6 -2">
+        <a-plane
+          id="intro-image-3d"
+          width="1.8"
+          height="1.1"
+          material="src: #intro1; transparent: true; side: double">
+        </a-plane>
 
-      <!-- 4) Your other scene objects -->
+        <a-plane
+          id="intro-button-3d"
+          class="clickable"
+          position="0 -0.9 0.01"
+          width="0.9"
+          height="0.3"
+          material="color: #2196F3"
+          text="value: Next; align: center; color: #FFFFFF; width: 2">
+        </a-plane>
+      </a-entity>
+
+      <!-- Your box -->
       <a-box 
         position="0 1.3 -1" 
         width="0.5" 
