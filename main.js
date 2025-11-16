@@ -7,11 +7,12 @@ import 'aframe';
 document.addEventListener('DOMContentLoaded', () => {
   // ----- INTRO OVERLAY LOGIC -----
   const introImages = [
-    '/images/intro1.png',
-    '/images/intro2.png',
-    '/images/intro3.png',
-    '/images/intro4.png'
+    './images/intro1.png',
+    './images/intro2.png',
+    './images/intro3.png',
+    './images/intro4.png'
   ];
+  
 
   const introOverlay = document.getElementById('intro-overlay');
   const introImageEl = document.getElementById('intro-image');
@@ -41,10 +42,17 @@ document.addEventListener('DOMContentLoaded', () => {
         currentIntroIndex += 1;
         updateIntroScreen();
       } else {
-        // Last image, "Start" pressed -> hide overlay
+        // Last image: "Start" pressed
         introOverlay.style.display = 'none';
+
+        // Now enter VR/AR from this user gesture
+        const scene = document.querySelector('a-scene');
+        if (scene && typeof scene.enterVR === 'function') {
+          scene.enterVR();
+        }
       }
     });
+
   }
 
   // ----- EXISTING A-FRAME / AR LOGIC -----
