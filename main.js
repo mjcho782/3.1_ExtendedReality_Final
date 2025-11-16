@@ -3,69 +3,69 @@
 // 1) Import A-Frame
 import 'aframe';
 
-// 2) WebXR AR configuration with intro overlay + automatic AR mode request
+// 2) WebXR AR configuration + 3D intro panel
 document.addEventListener('DOMContentLoaded', () => {
-  // ----- INTRO OVERLAY LOGIC -----
-  // Images should be in: public/images/intro1.png ... intro4.png
-  const introImages = [
-    '/images/intro1.png',
-    '/images/intro2.png',
-    '/images/intro3.png',
-    '/images/intro4.png'
-  ];
-
-  const introOverlay = document.getElementById('intro-overlay');
-  const introImageEl = document.getElementById('intro-image');
-  const introButton = document.getElementById('intro-button');
-
-  let currentIntroIndex = 0;
-
-  function updateIntroScreen() {
-    if (!introImageEl || !introButton) return;
-
-    introImageEl.src = introImages[currentIntroIndex];
-
-    // Last image -> show "Start"
-    if (currentIntroIndex === introImages.length - 1) {
-      introButton.textContent = 'Start';
-    } else {
-      introButton.textContent = 'Next';
-    }
-  }
-
-  // We hook the button *before* touching XR stuff
-  if (introOverlay && introImageEl && introButton && introImages.length > 0) {
-    // Make sure the overlay is visible (matches your CSS which uses display:flex)
-    introOverlay.style.display = 'flex';
-
-    // Load first image
-    updateIntroScreen();
-
-    introButton.addEventListener('click', () => {
-      if (currentIntroIndex < introImages.length - 1) {
-        // Go to next image
-        currentIntroIndex += 1;
-        updateIntroScreen();
-      } else {
-        // Last image -> "Start" clicked
-        introOverlay.style.display = 'none';
-
-        // Now enter AR/VR from this user gesture
-        const sceneForEnter = document.querySelector('a-scene');
-        if (sceneForEnter && typeof sceneForEnter.enterVR === 'function') {
-          sceneForEnter.enterVR();
-        }
-      }
-    });
-  }
-
-  // ----- EXISTING A-FRAME / AR LOGIC -----
   const scene = document.querySelector('a-scene');
   if (!scene) return;
 
-  // Wait for scene to be fully loaded
+  // ----- 3D INTRO PANEL LOGIC -----
+  // Uses the <a-assets> images with ids: #intro1, #intro2, #intro3, #intro4
   scene.addEventListener('loaded', () => {
-    // Check AR support
+    const textures = ['#intro1', '#intro2', '#intro3', '#intro4'];
+
+    const img = document.querySelector('#intro-image-3d');
+    const btn = document.querySelector('#intro-button-3d');
+    const panel = document.querySelector('#intro-panel');
+
+    if (!img || !btn || !panel) {
+      console.warn('Intro panel elements not found (check ids and scene markup).');
+      return;
+    }
+
+    let index = 0;
+
+    function updatePanel() {
+      // Set current image as material
+      img.setAttribute(
+        'material',
+        `src: ${textures[index]}; transparent: true; side: double`
+      );
+
+      // Change button label for last slide
+      if (index === textures.length - 1) {
+        btn.setAttribute(
+          'text',
+          'value: Start; align: center; color: #FFFFFF; width: 2'
+        );
+      } else {
+        btn.setAttribute(
+          'text',
+          'value: Next; align: center; color: #FFFFFF; width: 2'
+        );
+      }
+    }
+
+    // Initial image + label
+    updatePanel();
+
+    // Click handler for the 3D button (via cursor/raycaster)
+    btn.addEventListener('click', () => {
+      if (index < textures.length - 1) {
+        index += 1;
+        updatePanel();
+      } else {
+        // "Start" clicked → remove the intro panel from the scene
+        if (panel.parentNode) {
+          panel.parentNode.removeChild(panel);
+        }
+        // At this point you can also start your actual game logic if needed
+      }
+    });
+  });
+
+  // ----- EXISTING A-FRAME / AR LOGIC -----
+  // Override enterVR to request immersive AR with hand tracking when available
+  scene.addEventListener('loaded', () => {
     if (!('xr' in navigator)) {
       console.warn('WebXR not available in this browser.');
       return;
@@ -73,46 +73,48 @@ document.addEventListener('DOMContentLoaded', () => {
 
     navigator.xr.isSessionSupported('immersive-ar').then((arSupported) => {
       console.log('immersive-ar supported:', arSupported);
-      if (arSupported) {
-        // Override enterVR to request AR mode instead
-        const originalEnterVR = scene.enterVR.bind(scene);
-        scene.enterVR = async function () {
-          try {
-            // Request AR session with hand tracking
-            const optionalFeatures = ['hand-tracking', 'hit-test'];
-            console.log('Requesting AR session with hand tracking...');
+      if (!arSupported) return;
 
-            const session = await navigator.xr.requestSession('immersive-ar', {
-              requiredFeatures: ['local-floor'],
-              optionalFeatures: optionalFeatures
-            });
+      const originalEnterVR = scene.enterVR.bind(scene);
 
-            // Set up the session properly for A-Frame
-            this.xrSession = session;
-            this.renderer.xr.enabled = true;
-            this.renderer.xr.setSession(session);
+      scene.enterVR = async function () {
+        try {
+          const optionalFeatures = ['hand-tracking', 'hit-test'];
+          console.log('Requesting AR session with hand tracking...');
 
-            // Wait a frame for renderer to initialize, then trigger enter-vr
-            requestAnimationFrame(() => {
-              this.emit('enter-vr');
-            });
+          const session = await navigator.xr.requestSession('immersive-ar', {
+            requiredFeatures: ['local-floor'],
+            optionalFeatures
+          });
 
+          this.xrSession = session;
+          this.renderer.xr.enabled = true;
+          this.renderer.xr.setSession(session);
+
+          // Let A-Frame know we "entered vr"
+          requestAnimationFrame(() => {
+            this.emit('enter-vr');
+          });
+
+          console.log(
+            'AR session started. Environment blend mode:',
+            session.environmentBlendMode
+          );
+
+          if (session.enabledFeatures) {
             console.log(
-              'AR session started. Environment blend mode:',
-              session.environmentBlendMode
+              'Hand tracking enabled:',
+              session.enabledFeatures.includes('hand-tracking')
             );
-            if (session.enabledFeatures) {
-              console.log(
-                'Hand tracking enabled:',
-                session.enabledFeatures.includes('hand-tracking')
-              );
-            }
-          } catch (error) {
-            console.error('Failed to start AR session, falling back to VR:', error);
-            originalEnterVR();
           }
-        };
-      }
+        } catch (error) {
+          console.error(
+            'Failed to start AR session, falling back to default enterVR():',
+            error
+          );
+          originalEnterVR();
+        }
+      };
     });
   });
 
@@ -120,61 +122,65 @@ document.addEventListener('DOMContentLoaded', () => {
   scene.addEventListener('enter-vr', () => {
     const renderer = scene.renderer;
     const xrManager = renderer && renderer.xr;
-    const session = xrManager && xrManager.getSession && xrManager.getSession();
+    const session =
+      xrManager && xrManager.getSession && xrManager.getSession();
 
-    if (session) {
-      console.log('XR session started.');
-      console.log('Session mode:', session.mode);
-      console.log('Environment blend mode:', session.environmentBlendMode);
+    if (!session) {
+      console.warn('No XR session found on enter-vr.');
+      return;
+    }
 
-      // Check hand tracking support
-      if (session.enabledFeatures) {
-        const hasHandTracking = session.enabledFeatures.includes('hand-tracking');
-        console.log('Hand tracking enabled in session:', hasHandTracking);
-        if (!hasHandTracking) {
-          console.warn(
-            'Hand tracking was requested but not enabled. Check headset settings.'
-          );
-        }
-      } else {
-        // Some browsers don't expose enabledFeatures, check input sources
-        session.inputSources.forEach((inputSource, index) => {
-          console.log(`Input source ${index}:`, {
-            handedness: inputSource.handedness,
-            targetRayMode: inputSource.targetRayMode,
-            hasHandTracking: !!inputSource.hand
-          });
+    console.log('XR session started.');
+    console.log('Session mode:', session.mode);
+    console.log('Environment blend mode:', session.environmentBlendMode);
+
+    // Check hand tracking support
+    if (session.enabledFeatures) {
+      const hasHandTracking = session.enabledFeatures.includes('hand-tracking');
+      console.log('Hand tracking enabled in session:', hasHandTracking);
+      if (!hasHandTracking) {
+        console.warn(
+          'Hand tracking was requested but not enabled. Check headset settings.'
+        );
+      }
+    } else {
+      // Some browsers don't expose enabledFeatures; log input sources instead
+      session.inputSources.forEach((inputSource, index) => {
+        console.log(`Input source ${index}:`, {
+          handedness: inputSource.handedness,
+          targetRayMode: inputSource.targetRayMode,
+          hasHandTracking: !!inputSource.hand
         });
-      }
-
-      if (
-        session.mode === 'immersive-ar' &&
-        session.environmentBlendMode === 'alpha-blend'
-      ) {
-        console.log('AR passthrough is active - camera feed should be visible');
-      }
-
-      // Verify hand tracking controls are initialized
-      const handTrackingControls = scene.querySelectorAll(
-        '[hand-tracking-controls]'
-      );
-      console.log(
-        'Hand tracking control entities found:',
-        handTrackingControls.length
-      );
-      handTrackingControls.forEach((el, index) => {
-        const component = el.components['hand-tracking-controls'];
-        if (component) {
-          console.log(
-            `Hand tracking control ${index} (${el.getAttribute('hand')}) initialized:`,
-            !!component
-          );
-        } else {
-          console.warn(
-            `Hand tracking control ${index} component not found`
-          );
-        }
       });
     }
+
+    if (
+      session.mode === 'immersive-ar' &&
+      session.environmentBlendMode === 'alpha-blend'
+    ) {
+      console.log('AR passthrough is active - camera feed should be visible');
+    }
+
+    // Verify hand tracking control entities
+    const handTrackingControls = scene.querySelectorAll(
+      '[hand-tracking-controls]'
+    );
+    console.log(
+      'Hand tracking control entities found:',
+      handTrackingControls.length
+    );
+    handTrackingControls.forEach((el, index) => {
+      const component = el.components['hand-tracking-controls'];
+      if (component) {
+        console.log(
+          `Hand tracking control ${index} (${el.getAttribute('hand')}) initialized:`,
+          !!component
+        );
+      } else {
+        console.warn(
+          `Hand tracking control ${index} component not found`
+        );
+      }
+    });
   });
 });
