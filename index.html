@@ -18,10 +18,56 @@
         width: 100vw;
         height: 100vh;
       }
+    
+      /* Intro overlay styles */
+      #intro-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.7); /* dim background over AR scene */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999; /* make sure it stays on top of the scene */
+      }
+    
+      #intro-content {
+        background: #ffffff;
+        padding: 16px;
+        border-radius: 12px;
+        max-width: 90vw;
+        max-height: 80vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+      }
+    
+      #intro-image {
+        max-width: 100%;
+        max-height: 60vh;
+        object-fit: contain;
+      }
+    
+      #intro-button {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 999px;
+        font-size: 16px;
+        cursor: pointer;
+      }
     </style>
+    
     <script type="module" src="/main.js"></script>
   </head>
   <body>
+    <!-- Intro overlay -->
+    <div id="intro-overlay">
+      <div id="intro-content">
+        <img id="intro-image" src="" alt="Intro screen" />
+        <button id="intro-button">Next</button>
+      </div>
+    </div>
+  
     <a-scene 
       background="transparent"
       renderer="colorManagement: true; sortObjects: true; alpha: true"
@@ -43,4 +89,5 @@
       <a-entity hand-tracking-controls="hand: right"></a-entity>
     </a-scene>
   </body>
+  
 </html>

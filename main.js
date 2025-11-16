@@ -3,18 +3,51 @@
 // 1) Import A-Frame
 import 'aframe';
 
-// 2) Import your custom components
-import './pinchable.js';
-import './color-change.js';
-import './slider.js';
-import './size-change.js';
-import './button.js';
-import './menu.js';
-import './pressable.js';
-import './event-manager.js';
-
-// 3) WebXR AR configuration with automatic AR mode request
+// 2) WebXR AR configuration with automatic AR mode request
 document.addEventListener('DOMContentLoaded', () => {
+  // ----- INTRO OVERLAY LOGIC -----
+  const introImages = [
+    '/images/intro1.png',
+    '/images/intro2.png',
+    '/images/intro3.png',
+    '/images/intro4.png'
+  ];
+
+  const introOverlay = document.getElementById('intro-overlay');
+  const introImageEl = document.getElementById('intro-image');
+  const introButton = document.getElementById('intro-button');
+
+  let currentIntroIndex = 0;
+
+  function updateIntroScreen() {
+    if (!introImageEl || !introButton) return;
+
+    introImageEl.src = introImages[currentIntroIndex];
+
+    // Last image -> show "Start"
+    if (currentIntroIndex === introImages.length - 1) {
+      introButton.textContent = 'Start';
+    } else {
+      introButton.textContent = 'Next';
+    }
+  }
+
+  if (introOverlay && introButton && introImageEl && introImages.length > 0) {
+    // Initialize first image
+    updateIntroScreen();
+
+    introButton.addEventListener('click', () => {
+      if (currentIntroIndex < introImages.length - 1) {
+        currentIntroIndex += 1;
+        updateIntroScreen();
+      } else {
+        // Last image, "Start" pressed -> hide overlay
+        introOverlay.style.display = 'none';
+      }
+    });
+  }
+
+  // ----- EXISTING A-FRAME / AR LOGIC -----
   const scene = document.querySelector('a-scene');
   if (!scene) return;
 
