@@ -84,6 +84,7 @@
       </a-assets>
 
       <!-- 2) Camera + cursor so we can click in VR/AR -->
+      <!-- 2) Camera + cursor so we can click in VR/AR -->
       <a-entity id="rig" position="0 1.6 0">
         <a-camera>
           <a-entity 
@@ -93,28 +94,29 @@
             geometry="primitive: ring; radiusInner: 0.01; radiusOuter: 0.015"
             material="color: white; shader: flat">
           </a-entity>
+
+          <!-- ⭐ Move INTRO PANEL inside the camera so it stays eye-level -->
+          <a-entity id="intro-panel" position="0 0 -2">
+            <a-plane
+              id="intro-image-3d"
+              width="1.8"
+              height="1.1"
+              material="src: #intro1; transparent: true; side: double">
+            </a-plane>
+
+            <a-plane
+              id="intro-button-3d"
+              class="clickable"
+              position="0 -0.9 0.01"
+              width="0.9"
+              height="0.3"
+              material="color: #2196F3"
+              text="value: Next; align: center; color: #FFFFFF; width: 2">
+            </a-plane>
+          </a-entity>
         </a-camera>
       </a-entity>
 
-      <!-- 3) 3D Intro panel (will be visible in VR/AR) -->
-      <a-entity id="intro-panel" position="0 1.6 -2">
-        <a-plane
-          id="intro-image-3d"
-          width="1.8"
-          height="1.1"
-          material="src: #intro1; transparent: true; side: double">
-        </a-plane>
-
-        <a-plane
-          id="intro-button-3d"
-          class="clickable"
-          position="0 -0.9 0.01"
-          width="0.9"
-          height="0.3"
-          material="color: #2196F3"
-          text="value: Next; align: center; color: #FFFFFF; width: 2">
-        </a-plane>
-      </a-entity>
 
       <!-- 4) Your other scene objects -->
       <a-box 
