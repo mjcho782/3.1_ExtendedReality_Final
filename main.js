@@ -1,6 +1,6 @@
 // main.js
 
-// 1) Import A-Frame
+// 1) Import A-Frame (from npm)
 import 'aframe';
 
 // 2) Import your custom components
@@ -13,45 +13,42 @@ import './menu.js';
 import './pressable.js';
 import './event-manager.js';
 
-// 3) Minimal WebXR config + debug (no manual session override)
+// 3) Let A-Frame handle WebXR; just configure & log support
 document.addEventListener('DOMContentLoaded', () => {
   const scene = document.querySelector('a-scene');
   if (!scene) return;
 
-  // Let A-Frame manage WebXR, just make sure we request hand-tracking
-  // and a reasonable reference space.
+  // Ask for the features we care about
   scene.setAttribute(
     'webxr',
-    'requiredFeatures: local-floor; optionalFeatures: hand-tracking'
+    'requiredFeatures: local-floor; optionalFeatures: hand-tracking, hit-test'
   );
 
-  // Simple console debug so you can see what the device supports
+  // Simple debug so you can check what Quest Browser exposes
   if (!('xr' in navigator)) {
     console.warn('WebXR not available in this browser.');
     return;
   }
 
-  navigator.xr.isSessionSupported('immersive-vr').then((vrSupported) => {
-    console.log('immersive-vr supported:', vrSupported);
-  });
+  navigator.xr.isSessionSupported('immersive-vr')
+    .then(supported => console.log('immersive-vr supported:', supported))
+    .catch(err => console.warn('immersive-vr check failed:', err));
 
-  navigator.xr.isSessionSupported('immersive-ar').then((arSupported) => {
-    console.log('immersive-ar supported:', arSupported);
-  });
+  navigator.xr.isSessionSupported('immersive-ar')
+    .then(supported => console.log('immersive-ar supported:', supported))
+    .catch(err => console.warn('immersive-ar check failed:', err));
 
-  // Log when we enter XR (VR or AR), just for inspection
   scene.addEventListener('enter-vr', () => {
     const renderer = scene.renderer;
     const xrManager = renderer && renderer.xr;
     const session = xrManager && xrManager.getSession && xrManager.getSession();
 
     if (!session) {
-      console.log('Entered VR/AR, but no XR session found (yet).');
+      console.log('XR session started but no session object yet.');
       return;
     }
 
     console.log('XR session started.');
-    console.log('Session mode (if exposed):', session.mode); // may be undefined
-    console.log('Environment blend mode:', session.environmentBlendMode);
+    console.log('environmentBlendMode:', session.environmentBlendMode);
   });
 });
