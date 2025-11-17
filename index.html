@@ -56,9 +56,21 @@
         font-size: 16px;
         cursor: pointer;
       }
+
+      #detection-overlay {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 5000; /* below intro overlay (9999), above scene */
+      }
+
     </style>
     
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+
     <script type="module" src="/main.js"></script>
+
   </head>
   <body>
     <!-- Intro overlay -->
@@ -69,11 +81,19 @@
       </div>
     </div>
   
+    <!-- Hidden camera feed (for object detection) -->
+    <video id="cameraFeed" autoplay playsinline style="display:none;"></video>
+
+    <!-- Overlay canvas for darkening boxes -->
+    <canvas id="detection-overlay"></canvas>
+
+
     <a-scene
       background="transparent"
       renderer="colorManagement: true; sortObjects: true; alpha: true"
       webxr="referenceSpaceType: local-floor; requiredFeatures: local-floor; optionalFeatures: hand-tracking, hit-test"
       vr-mode-ui="enabled: true">
+    :contentReference[oaicite:0]{index=0}
 
       <!-- Assets -->
       <a-assets>

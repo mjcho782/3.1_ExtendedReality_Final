@@ -14,107 +14,142 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const img = document.querySelector('#intro-image-3d');
     const btn = document.querySelector('#intro-button-3d');
-    const panel = document.querySelector('#intro-panel');
+    const prevBtn = document.querySelector('#intro-prev');
+    const nextBtn = document.querySelector('#intro-next');
+    const progressBars = Array.from(document.querySelectorAll('.progress-bar'));
 
-    if (!img || !btn || !panel) {
-      console.warn('Intro panel elements not found (check ids in index.html).');
-    } else {
-      let index = 0;
+    let currentIndex = 0;
 
-      function updatePanel() {
-        img.setAttribute(
-          'material',
-          `src: ${textures[index]}; transparent: true; side: double`
-        );
+    function updateIntroTexture() {
+      if (!img) return;
+      img.setAttribute('src', textures[currentIndex]);
+      console.log('Updated intro texture to', textures[currentIndex]);
+    }
 
-        if (index === textures.length - 1) {
-          btn.setAttribute(
-            'text',
-            'value: Start; align: center; color: #FFFFFF; width: 2'
-          );
-        } else {
-          btn.setAttribute(
-            'text',
-            'value: Next; align: center; color: #FFFFFF; width: 2'
-          );
-        }
-      }
-
-      function handleButtonClick() {
-        // If panel already removed, ignore
-        if (!panel.parentNode) return;
-
-        if (index < textures.length - 1) {
-          index += 1;
-          updatePanel();
-        } else {
-          // "Start" → remove intro panel
-          panel.parentNode.removeChild(panel);
-          console.log('Intro panel removed; game can start.');
-        }
-      }
-
-      // Initial image + button text
-      updatePanel();
-
-      // Normal click (mouse / controller / VR cursor)
-      btn.addEventListener('click', () => {
-        console.log('Intro button clicked via cursor / mouse.');
-        handleButtonClick();
-      });
-
-      // ===== 2. HAND RAYS + PINCH → CLICK =====
-      // Hands have raycaster="objects: .clickable; showLine: true"
-      const hands = [
-        document.querySelector('#leftHand'),
-        document.querySelector('#rightHand')
-      ].filter(Boolean);
-
-      hands.forEach((handEl, idx) => {
-        console.log('Registering pinch listener on hand', idx);
-
-        handEl.addEventListener('pinchended', () => {
-          console.log('pinchended from hand', idx);
-
-          const ray = handEl.components.raycaster;
-          if (!ray) {
-            console.warn('This hand has no raycaster component.');
-            return;
-          }
-
-          const intersections = ray.intersections || [];
-          if (!intersections.length) {
-            console.log('Hand ray not hitting any .clickable when pinched.');
-            return;
-          }
-
-          // Take the closest intersection
-          const targetObj = intersections[0].object;
-          const targetEl = targetObj && targetObj.el;
-
-          if (!targetEl) {
-            console.log('Intersection has no A-Frame entity attached.');
-            return;
-          }
-
-          // Optional: only act if it's actually clickable
-          if (!targetEl.classList || !targetEl.classList.contains('clickable')) {
-            console.log(
-              'Pinch hit something, but it is not .clickable (id=',
-              targetEl.id,
-              ').'
-            );
-            return;
-          }
-
-          console.log(
-            'Pinch → emitting click on',
-            targetEl.id || targetEl.tagName
-          );
-          targetEl.emit('click');
-        });
+    function updateProgressBars() {
+      progressBars.forEach((bar, index) => {
+        bar.classList.toggle('active', index === currentIndex);
       });
     }
+
+    function goToScreen(index) {
+      currentIndex = index;
+      updateIntroTexture();
+      updateProgressBars();
+    }
+
+    updateIntroTexture();
+    updateProgressBars();
+
+    if (nextBtn) {
+      nextBtn.addEventListener('click', () => {
+        currentIndex = (currentIndex + 1) % textures.length;
+        goToScreen(currentIndex);
+      });
+    }
+
+    if (prevBtn) {
+      prevBtn.addEventListener('click', () => {
+        currentIndex = (currentIndex - 1 + textures.length) % textures.length;
+        goToScreen(currentIndex);
+      });
+    }
+
+    const ctaText = document.querySelector('#cta-text');
+
+    function showCTAText(message, duration = 2000) {
+      if (!ctaText) return;
+
+      ctaText.textContent = message;
+      ctaText.style.opacity = '1';
+
+      setTimeout(() => {
+        ctaText.style.opacity = '0';
+      }, duration);
+    }
+
+    function startGame() {
+      const introOverlay = document.querySelector('#intro-overlay');
+      if (introOverlay) {
+        introOverlay.style.opacity = '0';
+        introOverlay.style.pointerEvents = 'none';
+      }
+
+      showCTAText('Now you must protect the DT student from their reality. ');
+
+      setTimeout(() => {
+        const timer = document.querySelector('.timer');
+        const minutesSpan = document.querySelector('.minutes');
+        const secondsSpan = document.querySelector('.seconds');
+
+        if (!timer || !minutesSpan || !secondsSpan) return;
+
+        timer.style.display = 'block';
+
+        let timeLeft = 5 * 60;
+
+        const timerInterval = setInterval(() => {
+          if (timeLeft <= 0) {
+            clearInterval(timerInterval);
+            timer.style.display = 'none';
+            return;
+          }
+
+          timeLeft--;
+
+          const minutes = Math.floor(timeLeft / 60);
+          const seconds = timeLeft % 60;
+          minutesSpan.textContent = String(minutes).padStart(2, '0');
+          secondsSpan.textContent = String(seconds).padStart(2, '0');
+        }, 1000);
+      }, 2000);
+    }
+
+    if (btn) {
+      btn.addEventListener('click', () => {
+        startGame();
+      });
+    }
+
+    // ===== 2. HAND TRACKING GESTURES (QUEST / XR HANDS) =====
+    const rightHand = scene.querySelector('#rightHand');
+    const leftHand = scene.querySelector('#leftHand');
+
+    function handlePinch(handEl, side) {
+      handEl.addEventListener('pinchstarted', (evt) => {
+        const intersection = evt.detail && evt.detail.intersection;
+        if (!intersection || !intersection.object) {
+          console.warn('No intersection object found on pinch for', side, 'hand');
+          return;
+        }
+
+        const targetMesh = intersection.object;
+        if (!targetMesh.el) {
+          console.warn('Intersection object has no A-Frame el for pinch target.');
+          return;
+        }
+
+        const targetEl = targetMesh.el;
+        console.log('Pinch → click on', side, 'hand target:', targetEl);
+
+        if (!targetEl.classList.contains('clickable')) {
+          console.warn(
+            'Pinched object is not .clickable. Add class="clickable" and a click listener, e.g.:',
+            "el.addEventListener('click', () => console.log('clicked!'));"
+          );
+          return;
+        }
+
+        console.log(
+          'Pinch → emitting click on',
+          targetEl.id || targetEl.tagName
+        );
+        targetEl.emit('click');
+      });
+    }
+
+    if (rightHand) handlePinch(rightHand, 'right');
+    if (leftHand) handlePinch(leftHand, 'left');
 
     // ===== 3. AR SESSION OVERRIDE (enterVR → immersive-ar) =====
     if (!('xr' in navigator)) {
@@ -167,6 +202,134 @@ document.addEventListener('DOMContentLoaded', () => {
       };
     });
   });
+
+  // ===== 5. OBJECT DETECTION + DARKEN CENTER OBJECT =====
+  const video = document.getElementById('cameraFeed');
+  const overlay = document.getElementById('detection-overlay');
+  const ctx = overlay ? overlay.getContext('2d') : null;
+
+  let detectionModel = null;
+  let detectionRunning = false;
+
+  // 5.1 Resize overlay to match window
+  function resizeOverlay() {
+    if (!overlay) return;
+    overlay.width = window.innerWidth;
+    overlay.height = window.innerHeight;
+  }
+  if (overlay) {
+    resizeOverlay();
+    window.addEventListener('resize', resizeOverlay);
+  }
+
+  // 5.2 Start camera (back camera if available)
+  async function startCamera() {
+    if (!video) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' },
+        audio: false
+      });
+      video.srcObject = stream;
+      await video.play();
+      console.log('Camera started for object detection.');
+    } catch (err) {
+      console.error('Failed to start camera for detection:', err);
+    }
+  }
+
+  // 5.3 Load ML model
+  async function loadDetectionModel() {
+    try {
+      if (window.cocoSsd) {
+        detectionModel = await window.cocoSsd.load();
+        console.log('COCO-SSD model loaded.');
+      } else {
+        console.warn('cocoSsd script not found. Make sure it is loaded in index.html.');
+      }
+    } catch (err) {
+      console.error('Failed to load detection model:', err);
+    }
+  }
+
+  // 5.4 Main detection loop
+  async function detectionLoop() {
+    if (!detectionRunning || !detectionModel || !video || !overlay || !ctx) {
+      requestAnimationFrame(detectionLoop);
+      return;
+    }
+
+    if (video.readyState < 2) {
+      requestAnimationFrame(detectionLoop);
+      return;
+    }
+
+    try {
+      const predictions = await detectionModel.detect(video);
+
+      // Clear overlay
+      ctx.clearRect(0, 0, overlay.width, overlay.height);
+
+      const cx = overlay.width / 2;
+      const cy = overlay.height / 2;
+
+      const scaleX = overlay.width / video.videoWidth;
+      const scaleY = overlay.height / video.videoHeight;
+
+      predictions.forEach((pred) => {
+        const [x, y, width, height] = pred.bbox;
+
+        // Scale from video space to screen space
+        const sx = x * scaleX;
+        const sy = y * scaleY;
+        const sw = width * scaleX;
+        const sh = height * scaleY;
+
+        // Check if screen center is inside this bounding box
+        const centerInside =
+          cx >= sx &&
+          cx <= sx + sw &&
+          cy >= sy &&
+          cy <= sy + sh;
+
+        if (centerInside) {
+          // Draw dark semi-transparent overlay
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+          ctx.fillRect(sx, sy, sw, sh);
+
+          // Optional label
+          ctx.font = '16px Arial';
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+          ctx.fillText(pred.class, sx + 4, sy + 18);
+        }
+      });
+    } catch (err) {
+      console.error('Error during detection loop:', err);
+    }
+
+    requestAnimationFrame(detectionLoop);
+  }
+
+  // 5.5 Start everything
+  async function initDetection() {
+    if (!overlay || !video || !navigator.mediaDevices) {
+      console.warn('Detection overlay/video or mediaDevices not available.');
+      return;
+    }
+
+    try {
+      await startCamera();
+      await loadDetectionModel();
+
+      detectionRunning = true;
+      detectionLoop();
+    } catch (err) {
+      console.error('Failed to initialize detection:', err);
+    }
+  }
+
+  // Start detection after DOM content is ready
+  initDetection();
 
   // ===== 4. ENTER-VR DEBUG (optional, just logs) =====
   scene.addEventListener('enter-vr', () => {
