@@ -6,10 +6,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const scene = document.querySelector('a-scene');
   if (!scene) return;
 
+  // =========================
+  // 1. SCENE LOADED HANDLER
+  // =========================
   scene.addEventListener('loaded', () => {
     console.log('Scene loaded');
 
-    // ===== 1. INTRO PANEL SETUP =====
+    // ===== 1A. INTRO PANEL SETUP =====
     const textures = ['#intro1', '#intro2', '#intro3', '#intro4'];
 
     const img = document.querySelector('#intro-image-3d');
@@ -17,6 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const prevBtn = document.querySelector('#intro-prev');
     const nextBtn = document.querySelector('#intro-next');
     const progressBars = Array.from(document.querySelectorAll('.progress-bar'));
+    const ctaText = document.querySelector('#cta-text');
 
     let currentIndex = 0;
 
@@ -38,6 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
       updateProgressBars();
     }
 
+    // Initial state
     updateIntroTexture();
     updateProgressBars();
 
@@ -54,8 +59,6 @@ document.addEventListener('DOMContentLoaded', () => {
         goToScreen(currentIndex);
       });
     }
-
-    const ctaText = document.querySelector('#cta-text');
 
     function showCTAText(message, duration = 2000) {
       if (!ctaText) return;
@@ -86,7 +89,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         timer.style.display = 'block';
 
-        let timeLeft = 5 * 60;
+        let timeLeft = 5 * 60; // 5 minutes
 
         const timerInterval = setInterval(() => {
           if (timeLeft <= 0) {
@@ -111,47 +114,75 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
-    // ===== 2. HAND TRACKING GESTURES (QUEST / XR HANDS) =====
+    // =========================
+    // 2. HAND TRACKING → CLICK
+    // =========================
+
     const rightHand = scene.querySelector('#rightHand');
     const leftHand = scene.querySelector('#leftHand');
 
+    // Helper: raycast from camera center to find first `.clickable`
+    function clickCenterObject() {
+      const cameraEl = scene.camera && scene.camera.el;
+      if (!cameraEl || !scene.object3D) return;
+
+      const THREE = AFRAME.THREE;
+      const raycaster = new THREE.Raycaster();
+
+      // Origin = camera world position
+      const origin = new THREE.Vector3();
+      cameraEl.object3D.getWorldPosition(origin);
+
+      // Direction = camera forward (-Z in local space)
+      const direction = new THREE.Vector3(0, 0, -1);
+      const worldQuat = new THREE.Quaternion();
+      cameraEl.object3D.getWorldQuaternion(worldQuat);
+      direction.applyQuaternion(worldQuat).normalize();
+
+      raycaster.set(origin, direction);
+
+      // Intersect with entire scene
+      const intersects = raycaster.intersectObjects(
+        scene.object3D.children,
+        true
+      );
+
+      for (let i = 0; i < intersects.length; i++) {
+        const obj = intersects[i].object;
+        if (!obj) continue;
+
+        // Climb up to the A-Frame entity
+        let targetEl = obj.el;
+        let parentObj = obj.parent;
+        while (!targetEl && parentObj) {
+          targetEl = parentObj.el;
+          parentObj = parentObj.parent;
+        }
+
+        if (targetEl && targetEl.classList && targetEl.classList.contains('clickable')) {
+          console.log('Pinch → click on', targetEl.id || targetEl.tagName);
+          targetEl.emit('click');
+          return;
+        }
+      }
+    }
+
     function handlePinch(handEl, side) {
-      handEl.addEventListener('pinchstarted', (evt) => {
-        const intersection = evt.detail && evt.detail.intersection;
-        if (!intersection || !intersection.object) {
-          console.warn('No intersection object found on pinch for', side, 'hand');
-          return;
-        }
+      if (!handEl) return;
 
-        const targetMesh = intersection.object;
-        if (!targetMesh.el) {
-          console.warn('Intersection object has no A-Frame el for pinch target.');
-          return;
-        }
-
-        const targetEl = targetMesh.el;
-        console.log('Pinch → click on', side, 'hand target:', targetEl);
-
-        if (!targetEl.classList.contains('clickable')) {
-          console.warn(
-            'Pinched object is not .clickable. Add class="clickable" and a click listener, e.g.:',
-            "el.addEventListener('click', () => console.log('clicked!'));"
-          );
-          return;
-        }
-
-        console.log(
-          'Pinch → emitting click on',
-          targetEl.id || targetEl.tagName
-        );
-        targetEl.emit('click');
+      handEl.addEventListener('pinchstarted', () => {
+        console.log('Pinch started on', side, 'hand → casting ray from camera center');
+        clickCenterObject();
       });
     }
 
-    if (rightHand) handlePinch(rightHand, 'right');
-    if (leftHand) handlePinch(leftHand, 'left');
+    handlePinch(rightHand, 'right');
+    handlePinch(leftHand, 'left');
 
-    // ===== 3. AR SESSION OVERRIDE (enterVR → immersive-ar) =====
+    // =========================
+    // 3. AR SESSION OVERRIDE
+    // =========================
+
     if (!('xr' in navigator)) {
       console.warn('WebXR not available in this browser.');
       return;
@@ -201,9 +232,45 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       };
     });
+
+    // =========================
+    // 4. ENTER-VR DEBUG LOGS
+    // =========================
+    scene.addEventListener('enter-vr', () => {
+      const renderer = scene.renderer;
+      const xrManager = renderer && renderer.xr;
+      const session =
+        xrManager && xrManager.getSession && xrManager.getSession();
+
+      if (!session) {
+        console.warn('No XR session found on enter-vr.');
+        return;
+      }
+
+      console.log('XR session started.');
+      console.log('Session mode:', session.mode);
+      console.log('Environment blend mode:', session.environmentBlendMode);
+
+      if (session.enabledFeatures) {
+        const hasHandTracking =
+          session.enabledFeatures.includes('hand-tracking');
+        console.log('Hand tracking enabled in session:', hasHandTracking);
+      } else {
+        session.inputSources.forEach((inputSource, index) => {
+          console.log(`Input source ${index}:`, {
+            handedness: inputSource.handedness,
+            targetRayMode: inputSource.targetRayMode,
+            hasHandTracking: !!inputSource.hand
+          });
+        });
+      }
+    });
   });
 
-  // ===== 5. OBJECT DETECTION + DARKEN CENTER OBJECT =====
+  // ==========================================
+  // 5. GENERIC OBJECT DETECTION OVERLAY
+  // ==========================================
+
   const video = document.getElementById('cameraFeed');
   const overlay = document.getElementById('detection-overlay');
   const ctx = overlay ? overlay.getContext('2d') : null;
@@ -222,7 +289,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('resize', resizeOverlay);
   }
 
-  // 5.2 Start camera (back camera if available)
+  // 5.2 Start camera (back camera if possible)
   async function startCamera() {
     if (!video) return;
     try {
@@ -238,28 +305,30 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // 5.3 Load ML model
+  // 5.3 Load detection model (COCO-SSD, but we only use boxes)
   async function loadDetectionModel() {
     try {
       if (window.cocoSsd) {
         detectionModel = await window.cocoSsd.load();
-        console.log('COCO-SSD model loaded.');
+        console.log('COCO-SSD model loaded (used only for bounding boxes).');
       } else {
-        console.warn('cocoSsd script not found. Make sure it is loaded in index.html.');
+        console.warn(
+          'cocoSsd script not found. Make sure it is loaded in index.html.'
+        );
       }
     } catch (err) {
       console.error('Failed to load detection model:', err);
     }
   }
 
-  // 5.4 Main detection loop
+  // 5.4 Main detection loop (generic objects)
   async function detectionLoop() {
     if (!detectionRunning || !detectionModel || !video || !overlay || !ctx) {
       requestAnimationFrame(detectionLoop);
       return;
     }
 
-    if (video.readyState < 2) {
+    if (video.readyState < 2 || video.videoWidth === 0 || video.videoHeight === 0) {
       requestAnimationFrame(detectionLoop);
       return;
     }
@@ -279,11 +348,16 @@ document.addEventListener('DOMContentLoaded', () => {
       predictions.forEach((pred) => {
         const [x, y, width, height] = pred.bbox;
 
-        // Scale from video space to screen space
+        // Convert from video coords → screen coords
         const sx = x * scaleX;
         const sy = y * scaleY;
         const sw = width * scaleX;
         const sh = height * scaleY;
+
+        // Draw an outline box for ALL detected objects
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgba(0, 255, 0, 0.8)'; // green outline for debugging
+        ctx.strokeRect(sx, sy, sw, sh);
 
         // Check if screen center is inside this bounding box
         const centerInside =
@@ -293,14 +367,9 @@ document.addEventListener('DOMContentLoaded', () => {
           cy <= sy + sh;
 
         if (centerInside) {
-          // Draw dark semi-transparent overlay
+          // Darken the object under the center
           ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
           ctx.fillRect(sx, sy, sw, sh);
-
-          // Optional label
-          ctx.font = '16px Arial';
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-          ctx.fillText(pred.class, sx + 4, sy + 18);
         }
       });
     } catch (err) {
@@ -310,10 +379,10 @@ document.addEventListener('DOMContentLoaded', () => {
     requestAnimationFrame(detectionLoop);
   }
 
-  // 5.5 Start everything
+  // 5.5 Initialize detection
   async function initDetection() {
     if (!overlay || !video || !navigator.mediaDevices) {
-      console.warn('Detection overlay/video or mediaDevices not available.');
+      console.warn('Detection overlay / video / mediaDevices not available.');
       return;
     }
 
@@ -328,37 +397,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Start detection after DOM content is ready
+  // Start detection after DOM is ready
   initDetection();
-
-  // ===== 4. ENTER-VR DEBUG (optional, just logs) =====
-  scene.addEventListener('enter-vr', () => {
-    const renderer = scene.renderer;
-    const xrManager = renderer && renderer.xr;
-    const session =
-      xrManager && xrManager.getSession && xrManager.getSession();
-
-    if (!session) {
-      console.warn('No XR session found on enter-vr.');
-      return;
-    }
-
-    console.log('XR session started.');
-    console.log('Session mode:', session.mode);
-    console.log('Environment blend mode:', session.environmentBlendMode);
-
-    if (session.enabledFeatures) {
-      const hasHandTracking =
-        session.enabledFeatures.includes('hand-tracking');
-      console.log('Hand tracking enabled in session:', hasHandTracking);
-    } else {
-      session.inputSources.forEach((inputSource, index) => {
-        console.log(`Input source ${index}:`, {
-          handedness: inputSource.handedness,
-          targetRayMode: inputSource.targetRayMode,
-          hasHandTracking: !!inputSource.hand
-        });
-      });
-    }
-  });
 });
