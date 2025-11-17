@@ -9,8 +9,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!scene) return;
 
   // ----- 3D INTRO PANEL LOGIC -----
-  // Uses the <a-assets> images with ids: #intro1, #intro2, #intro3, #intro4
   scene.addEventListener('loaded', () => {
+    // 3D intro uses <a-assets> images: #intro1..#intro4
     const textures = ['#intro1', '#intro2', '#intro3', '#intro4'];
 
     const img = document.querySelector('#intro-image-3d');
@@ -18,20 +18,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const panel = document.querySelector('#intro-panel');
 
     if (!img || !btn || !panel) {
-      console.warn('Intro panel elements not found (check ids and scene markup).');
+      console.warn('Intro panel elements not found (check ids in index.html).');
       return;
     }
 
     let index = 0;
 
     function updatePanel() {
-      // Set current image as material
       img.setAttribute(
         'material',
         `src: ${textures[index]}; transparent: true; side: double`
       );
 
-      // Change button label for last slide
       if (index === textures.length - 1) {
         btn.setAttribute(
           'text',
@@ -45,27 +43,42 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // Initial image + label
-    updatePanel();
-
-    // Click handler for the 3D button (via cursor/raycaster)
-    btn.addEventListener('click', () => {
+    function handleButtonClick() {
       if (index < textures.length - 1) {
         index += 1;
         updatePanel();
       } else {
-        // "Start" clicked → remove the intro panel from the scene
+        // "Start" clicked → remove panel
         if (panel.parentNode) {
           panel.parentNode.removeChild(panel);
         }
-        // At this point you can also start your actual game logic if needed
+        // You can kick off game logic here if needed
       }
-    });
-  });
+    }
 
-  // ----- EXISTING A-FRAME / AR LOGIC -----
-  // Override enterVR to request immersive AR with hand tracking when available
-  scene.addEventListener('loaded', () => {
+    // Initial image + label
+    updatePanel();
+
+    // Click from cursor / mouse / controller
+    btn.addEventListener('click', handleButtonClick);
+
+    // ----- HAND-TRACKING → CLICK MAPPING -----
+    // Any pinch end while the panel exists will act as a button click
+    const hands = scene.querySelectorAll('[hand-tracking-controls]');
+    hands.forEach((handEl, idx) => {
+      console.log('Registered pinch listener on hand-tracking entity', idx);
+
+      handEl.addEventListener('pinchended', () => {
+        // If panel has already been removed, ignore
+        if (!panel.parentNode) return;
+
+        console.log('Pinch ended → treating as intro button click');
+        // Trigger the same logic as a normal click
+        handleButtonClick();
+      });
+    });
+
+    // ----- AR / WebXR OVERRIDE (enterVR → immersive-ar) -----
     if (!('xr' in navigator)) {
       console.warn('WebXR not available in this browser.');
       return;
@@ -91,7 +104,6 @@ document.addEventListener('DOMContentLoaded', () => {
           this.renderer.xr.enabled = true;
           this.renderer.xr.setSession(session);
 
-          // Let A-Frame know we "entered vr"
           requestAnimationFrame(() => {
             this.emit('enter-vr');
           });
@@ -118,7 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Log when we enter XR (VR or AR) and verify hand tracking
+  // ----- ENTER-VR: logging & hand tracking debug -----
   scene.addEventListener('enter-vr', () => {
     const renderer = scene.renderer;
     const xrManager = renderer && renderer.xr;
@@ -136,7 +148,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Check hand tracking support
     if (session.enabledFeatures) {
-      const hasHandTracking = session.enabledFeatures.includes('hand-tracking');
+      const hasHandTracking =
+        session.enabledFeatures.includes('hand-tracking');
       console.log('Hand tracking enabled in session:', hasHandTracking);
       if (!hasHandTracking) {
         console.warn(
@@ -173,7 +186,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const component = el.components['hand-tracking-controls'];
       if (component) {
         console.log(
-          `Hand tracking control ${index} (${el.getAttribute('hand')}) initialized:`,
+          `Hand tracking control ${index} (${el.getAttribute(
+            'hand-tracking-controls'
+          )}) initialized:`,
           !!component
         );
       } else {
