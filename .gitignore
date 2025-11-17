@@ -26,3 +26,15 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Python
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+
+# Node / Vite
+node_modules/
+
+# Misc
+.DS_Store
