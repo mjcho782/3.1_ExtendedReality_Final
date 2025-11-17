@@ -116,21 +116,19 @@
           text="value: Next; align: center; color: #FFFFFF; width: 2">
         </a-plane>
       </a-entity>
-      
 
-      <!-- Your box -->
-      <!-- <a-box 
-        position="0 1.4 -1"
-        width="0.5" 
-        height="0.5" 
-        depth="0.5"
-        material="color: #4CC3D9; opacity: 1.0;"
-        rotation="0 45 0">
-      </a-box> -->
+      <a-entity
+        id="leftHand"
+        hand-tracking-controls="hand: left"
+        raycaster="objects: .clickable; showLine: true">
+      </a-entity>
 
+      <a-entity
+        id="rightHand"
+        hand-tracking-controls="hand: right"
+        raycaster="objects: .clickable; showLine: true">
+      </a-entity>
 
-      <a-entity hand-tracking-controls="hand: left"></a-entity>
-      <a-entity hand-tracking-controls="hand: right"></a-entity>
 
     </a-scene>
 

@@ -1,6 +1,5 @@
 // main.js
 
-// Import A-Frame
 import 'aframe';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -8,9 +7,9 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!scene) return;
 
   scene.addEventListener('loaded', () => {
-    console.log('Scene loaded.');
+    console.log('Scene loaded');
 
-    // ===== 1. INTRO PANEL LOGIC =====
+    // ===== 1. INTRO PANEL SETUP =====
     const textures = ['#intro1', '#intro2', '#intro3', '#intro4'];
 
     const img = document.querySelector('#intro-image-3d');
@@ -42,75 +41,82 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       function handleButtonClick() {
-        if (!panel.parentNode) return; // already removed
+        // If panel already removed, ignore
+        if (!panel.parentNode) return;
 
         if (index < textures.length - 1) {
           index += 1;
           updatePanel();
         } else {
-          // "Start" clicked → remove intro panel
+          // "Start" → remove intro panel
           panel.parentNode.removeChild(panel);
           console.log('Intro panel removed; game can start.');
         }
       }
 
-      // Initial state
+      // Initial image + button text
       updatePanel();
 
-      // Normal click (mouse / controller / gaze cursor)
+      // Normal click (mouse / controller / VR cursor)
       btn.addEventListener('click', () => {
         console.log('Intro button clicked via cursor / mouse.');
         handleButtonClick();
       });
 
-      // ===== 2. PINCH → CURSOR CLICK MAPPING =====
-      // Use the visible circle (cursor entity) as the ray origin
-      const cursor = scene.querySelector('[cursor]');
-      if (!cursor) {
-        console.warn('No [cursor] entity found; pinch → click mapping disabled.');
-      } else {
-        function triggerCursorClickFromPinch() {
-          const raycasterComp = cursor.components.raycaster;
-          if (!raycasterComp) {
-            console.warn('Cursor has no raycaster component.');
+      // ===== 2. HAND RAYS + PINCH → CLICK =====
+      // Hands have raycaster="objects: .clickable; showLine: true"
+      const hands = [
+        document.querySelector('#leftHand'),
+        document.querySelector('#rightHand')
+      ].filter(Boolean);
+
+      hands.forEach((handEl, idx) => {
+        console.log('Registering pinch listener on hand', idx);
+
+        handEl.addEventListener('pinchended', () => {
+          console.log('pinchended from hand', idx);
+
+          const ray = handEl.components.raycaster;
+          if (!ray) {
+            console.warn('This hand has no raycaster component.');
             return;
           }
 
-          const intersections = raycasterComp.intersections || [];
-          if (intersections.length === 0) {
-            console.log('Pinch detected but cursor not pointing at any .clickable object.');
+          const intersections = ray.intersections || [];
+          if (!intersections.length) {
+            console.log('Hand ray not hitting any .clickable when pinched.');
             return;
           }
 
-          // Get the closest intersected A-Frame entity
+          // Take the closest intersection
           const targetObj = intersections[0].object;
           const targetEl = targetObj && targetObj.el;
 
           if (!targetEl) {
-            console.log('No A-Frame entity associated with intersection.');
+            console.log('Intersection has no A-Frame entity attached.');
             return;
           }
 
-          console.log('Pinch → emitting click on', targetEl.id || targetEl.tagName);
+          // Optional: only act if it's actually clickable
+          if (!targetEl.classList || !targetEl.classList.contains('clickable')) {
+            console.log(
+              'Pinch hit something, but it is not .clickable (id=',
+              targetEl.id,
+              ').'
+            );
+            return;
+          }
 
-          // Emit a click event on the intersected entity
+          console.log(
+            'Pinch → emitting click on',
+            targetEl.id || targetEl.tagName
+          );
           targetEl.emit('click');
-        }
-
-        // Listen to pinchended on both hands
-        const hands = scene.querySelectorAll('[hand-tracking-controls]');
-        hands.forEach((handEl, idx) => {
-          console.log('Setting pinch listener on hand-tracking entity', idx);
-
-          handEl.addEventListener('pinchended', () => {
-            console.log('pinchended from hand', idx, '→ treating as cursor click.');
-            triggerCursorClickFromPinch();
-          });
         });
-      }
+      });
     }
 
-    // ===== 3. AR SESSION OVERRIDE (enterVR → immersive-ar with hand tracking) =====
+    // ===== 3. AR SESSION OVERRIDE (enterVR → immersive-ar) =====
     if (!('xr' in navigator)) {
       console.warn('WebXR not available in this browser.');
       return;
@@ -162,7 +168,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // ===== 4. ENTER-VR DEBUG (optional) =====
+  // ===== 4. ENTER-VR DEBUG (optional, just logs) =====
   scene.addEventListener('enter-vr', () => {
     const renderer = scene.renderer;
     const xrManager = renderer && renderer.xr;
