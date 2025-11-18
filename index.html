@@ -2,8 +2,10 @@
 <html>
   <head>
     <meta charset="utf-8">
-    <title>Hand Tracking! • A-Frame</title>
+    <title>Hand Tracking Ghost Room • A-Frame</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Basic page + scene styles -->
     <style>
       * {
         margin: 0;
@@ -18,43 +20,16 @@
         width: 100vw;
         height: 100vh;
       }
-    
-      /* Intro overlay styles */
+
+      /* Intro overlay (kept if you ever want to re-use it) */
       #intro-overlay {
         position: fixed;
         inset: 0;
         background: rgba(0, 0, 0, 0.7);
-        display: flex;             /* important: flex so JS can set display:flex */
+        display: none;
         align-items: center;
         justify-content: center;
         z-index: 9999;
-      }
-
-    
-      #intro-content {
-        background: #ffffff;
-        padding: 16px;
-        border-radius: 12px;
-        max-width: 90vw;
-        max-height: 80vh;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 12px;
-      }
-    
-      #intro-image {
-        max-width: 100%;
-        max-height: 60vh;
-        object-fit: contain;
-      }
-    
-      #intro-button {
-        padding: 10px 20px;
-        border: none;
-        border-radius: 999px;
-        font-size: 16px;
-        cursor: pointer;
       }
 
       #detection-overlay {
@@ -63,66 +38,67 @@
         pointer-events: none;
         z-index: 5000; /* below intro overlay (9999), above scene */
       }
-
     </style>
-    
+
+    <!-- TF / COCO-SSD for camera object detection overlay (still kept) -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
 
+    <!-- Vite / bundler entry (imports 'aframe' inside main.js) -->
     <script type="module" src="/main.js"></script>
-
   </head>
+
   <body>
-  
     <!-- Hidden camera feed (for object detection) -->
     <video id="cameraFeed" autoplay playsinline style="display:none;"></video>
 
     <!-- Overlay canvas for darkening boxes -->
     <canvas id="detection-overlay"></canvas>
 
-
     <a-scene
       background="transparent"
       renderer="colorManagement: true; sortObjects: true; alpha: true"
       webxr="referenceSpaceType: local-floor; requiredFeatures: local-floor; optionalFeatures: hand-tracking, hit-test"
       vr-mode-ui="enabled: true">
-    :contentReference[oaicite:0]{index=0}
 
       <!-- Assets -->
       <a-assets>
+        <!-- Intro images -->
         <img id="intro1" src="/images/intro1.png">
         <img id="intro2" src="/images/intro2.png">
         <img id="intro3" src="/images/intro3.png">
         <img id="intro4" src="/images/intro4.png">
+
+        <!-- Room + ghost models (in /public) -->
+        <a-asset-item id="room" src="/room.glb"></a-asset-item>
+        <a-asset-item id="ghost" src="/ghost.glb"></a-asset-item>
       </a-assets>
 
-      <!-- Camera + cursor -->
+      <!-- Camera + cursor (ray from center; hits .clickable) -->
       <a-entity id="rig" position="0 0 0">
         <a-camera position="0 1.6 0">
-          <a-entity 
+          <a-entity
             cursor="fuse: false"
-            raycaster="objects: .clickable"
+            raycaster="objects: .clickable; recursive: true"
             position="0 0 -1"
             geometry="primitive: ring; radiusInner: 0.01; radiusOuter: 0.015"
             material="color: white; shader: flat">
           </a-entity>
         </a-camera>
-      </a-entity>
-      
-
-      <!-- ⭐ WORLD-ANCHORED INTRO PANEL (won’t move with camera) -->
-      <a-entity id="intro-panel" position="0 1.6 -2">
+        
+        <!-- Camera-relative intro panel (always centered in view) -->
+        <a-entity id="intro-panel" position="1 1.6 0" rotation="0 -90 0">
         <a-plane
           id="intro-image-3d"
           width="1.8"
           height="1.1"
           material="src: #intro1; transparent: true; side: double">
         </a-plane>
-      
+
         <a-plane
           id="intro-button-3d"
           class="clickable"
-          position="0 -0.9 0.01"
+          position="0 -0.9 0"
           width="0.9"
           height="0.3"
           material="color: #2196F3"
@@ -130,22 +106,33 @@
         </a-plane>
       </a-entity>
 
+      <!-- Hand tracking + raycasters to .clickable -->
       <a-entity
         id="leftHand"
         hand-tracking-controls="hand: left"
-        raycaster="objects: .clickable; showLine: true">
+        raycaster="objects: .clickable; showLine: true; recursive: true">
       </a-entity>
 
       <a-entity
         id="rightHand"
         hand-tracking-controls="hand: right"
-        raycaster="objects: .clickable; showLine: true">
+        raycaster="objects: .clickable; showLine: true; recursive: true">
       </a-entity>
 
+      <!-- Room model: will be auto-split into clickable parts by main.js -->
+      <a-entity
+        id="roomEntity"
+        gltf-model="#room"
+        position="0 0 0"
+        scale="1 1 1">
+      </a-entity>
 
+      <!-- Basic lighting for the room / ghost -->
+      <a-entity light="type: ambient; intensity: 0.6"></a-entity>
+      <a-entity
+        light="type: directional; intensity: 0.9"
+        position="0 4 -2">
+      </a-entity>
     </a-scene>
-
   </body>
-  
-  
 </html>
