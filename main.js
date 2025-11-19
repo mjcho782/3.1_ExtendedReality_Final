@@ -250,7 +250,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
-    /* ===== 1D. ENTER-VR DEBUG LOGS ===== */
+    /* ===== 1D. ENTER-VR DEBUG LOGS + HAND POSITION FIX ===== */
     scene.addEventListener('enter-vr', () => {
       const renderer = scene.renderer;
       const xrManager = renderer && renderer.xr;
@@ -277,6 +277,48 @@ document.addEventListener('DOMContentLoaded', () => {
           });
         });
       }
+
+      // Fix right hand position if it's offset incorrectly
+      // The hand-tracking-controls component should handle positioning, but sometimes
+      // the right hand gets an incorrect offset. Reset it periodically.
+      let positionFixAttempts = 0;
+      const maxFixAttempts = 10;
+      
+      const fixRightHandPosition = () => {
+        const rightHandEl = scene.querySelector('#rightHand');
+        const leftHandEl = scene.querySelector('#leftHand');
+        
+        if (rightHandEl && leftHandEl && positionFixAttempts < maxFixAttempts) {
+          const rightPos = rightHandEl.getAttribute('position');
+          const leftPos = leftHandEl.getAttribute('position');
+          
+          // Check if right hand has a significant Y offset (way down)
+          if (rightPos && rightPos.y < -0.5) {
+            // Reset to match left hand position
+            rightHandEl.setAttribute('position', leftPos || '0 0 0');
+            console.log('Fixed right hand position - was offset down');
+            
+            // Also check and fix the object3D position if needed
+            const rightObj3D = rightHandEl.object3D;
+            if (rightObj3D && rightObj3D.position.y < -0.5) {
+              rightObj3D.position.set(0, 0, 0);
+              console.log('Fixed right hand object3D position');
+            }
+            
+            positionFixAttempts++;
+          } else if (!rightPos || (rightPos.x === 0 && rightPos.y === 0 && rightPos.z === 0)) {
+            // Position looks correct, but keep checking
+            positionFixAttempts++;
+          }
+          
+          if (positionFixAttempts < maxFixAttempts) {
+            setTimeout(fixRightHandPosition, 200);
+          }
+        }
+      };
+      
+      // Start fixing after a short delay to let hand tracking initialize
+      setTimeout(fixRightHandPosition, 200);
     });
 
     /* --------------------------------------
