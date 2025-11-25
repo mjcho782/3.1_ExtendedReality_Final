@@ -98,219 +98,200 @@ AFRAME.registerComponent('hover-highlight', {
   }
 });
 
-AFRAME.registerComponent('triangle-selector', {
-  schema: {
-    pinchDistance:      { type: 'number', default: 0.03 }, // easier pinch detection
-    minHandsDistance:   { type: 'number', default: 0.05 }, // easier distance range
-    maxHandsDistance:   { type: 'number', default: 0.50 },
-    holdMs:             { type: 'number', default: 150 },
-    cooldownMs:         { type: 'number', default: 800 },
-    selectionRadius:    { type: 'number', default: 0.40 }  // slightly larger selection bubble
-  },
+// AFRAME.registerComponent('triangle-selector', {
+//   schema: {
+//     pinchDistance:      { type: 'number', default: 0.02 }, // meters thumb–index for pinch
+//     minHandsDistance:   { type: 'number', default: 0.06 }, // min distance between hand centers
+//     maxHandsDistance:   { type: 'number', default: 0.25 }, // max distance between hand centers
+//     holdMs:             { type: 'number', default: 150 },  // how long both-hands-pinch must be held (ms)
+//     cooldownMs:         { type: 'number', default: 800 },  // delay between triggers (ms)
+//     selectionRadius:    { type: 'number', default: 0.35 }  // radius around triangle center for selecting clickables
+//   },
 
-  init() {
-    this.scene = this.el.sceneEl;
+//   init() {
+//     this.scene = this.el.sceneEl;
 
-    this.leftHandEl = null;
-    this.rightHandEl = null;
+//     this.leftHandEl = null;
+//     this.rightHandEl = null;
 
-    this.holdSoFar = 0;
-    this.lastTriggerTime = -Infinity;
+//     this.holdSoFar = 0;
+//     this.lastTriggerTime = -Infinity;
 
-    this.gestureActive = false; // for debug state changes
+//     // Reusable vectors
+//     this.leftCenter = new THREE.Vector3();
+//     this.rightCenter = new THREE.Vector3();
+//     this.triangleCenter = new THREE.Vector3();
+//     this.tempPos = new THREE.Vector3();
+//     this.tempLook = new THREE.Vector3();
 
-    // Reusable vectors
-    this.leftCenter = new THREE.Vector3();
-    this.rightCenter = new THREE.Vector3();
-    this.triangleCenter = new THREE.Vector3();
-    this.tempPos = new THREE.Vector3();
-    this.tempLook = new THREE.Vector3();
+//     // --- Create subtle glowing triangle preview ---
+//     this.previewEl = document.createElement('a-entity');
 
-    // --- Glowing circle preview in the middle ---
-    this.previewEl = document.createElement('a-entity');
+//     // A small triangle shape in local space
+//     this.previewEl.setAttribute(
+//       'geometry',
+//       'primitive: triangle; vertexA: -0.05 -0.05 0; vertexB: 0.05 -0.05 0; vertexC: 0 0.06 0'
+//     );
 
-    // Circle instead of triangle
-    this.previewEl.setAttribute(
-      'geometry',
-      'primitive: circle; radius: 0.08; segments: 32'
-    );
+//     // Glowing, semi-transparent material
+//     this.previewEl.setAttribute(
+//       'material',
+//       'shader: standard; color: #00ffff; emissive: #00ffff; emissiveIntensity: 0.7; ' +
+//       'opacity: 0.4; transparent: true; metalness: 0; roughness: 1'
+//     );
 
-    this.previewEl.setAttribute(
-      'material',
-      'shader: standard; color: #00ffff; emissive: #00ffff; emissiveIntensity: 0.9; ' +
-      'opacity: 0.4; transparent: true; metalness: 0; roughness: 1'
-    );
+//     // Gentle pulsing animation
+//     this.previewEl.setAttribute(
+//       'animation__pulse',
+//       'property: scale; dir: alternate; dur: 600; easing: easeInOutSine; loop: true; ' +
+//       'from: 0.85 0.85 0.85; to: 1.05 1.05 1.05'
+//     );
 
-    // Gentle pulsing
-    this.previewEl.setAttribute(
-      'animation__pulse',
-      'property: scale; dir: alternate; dur: 600; easing: easeInOutSine; loop: true; ' +
-      'from: 0.9 0.9 0.9; to: 1.1 1.1 1.1'
-    );
+//     this.previewEl.setAttribute('visible', 'false');
 
-    this.previewEl.setAttribute('visible', 'false');
+//     // Attach to scene (or world-root if you prefer)
+//     if (this.scene) {
+//       this.scene.appendChild(this.previewEl);
+//     }
+//   },
 
-    if (this.scene) {
-      this.scene.appendChild(this.previewEl);
-    }
+//   tick(time, delta) {
+//     if (!this.scene || !this.scene.is('vr-mode')) {
+//       if (this.previewEl) this.previewEl.setAttribute('visible', 'false');
+//       return;
+//     }
 
-    this._loggedNoJoints = false;
-  },
+//     // Lazy-resolve hands
+//     if (!this.leftHandEl)  this.leftHandEl  = this.scene.querySelector('#leftHand');
+//     if (!this.rightHandEl) this.rightHandEl = this.scene.querySelector('#rightHand');
+//     if (!this.leftHandEl || !this.rightHandEl) return;
 
-  tick(time, delta) {
-    if (!this.scene || !this.scene.is('vr-mode')) {
-      if (this.previewEl) this.previewEl.setAttribute('visible', 'false');
-      this.gestureActive = false;
-      return;
-    }
+//     const leftComp  = this.leftHandEl.components['hand-tracking-controls'];
+//     const rightComp = this.rightHandEl.components['hand-tracking-controls'];
+//     if (!leftComp || !rightComp || !leftComp.controller || !rightComp.controller) return;
 
-    // Lazy-resolve hands
-    if (!this.leftHandEl)  this.leftHandEl  = this.scene.querySelector('#leftHand');
-    if (!this.rightHandEl) this.rightHandEl = this.scene.querySelector('#rightHand');
-    if (!this.leftHandEl || !this.rightHandEl) return;
+//     const leftJoints  = leftComp.controller.joints;
+//     const rightJoints = rightComp.controller.joints;
+//     if (!leftJoints || !rightJoints) return;
 
-    const leftComp  = this.leftHandEl.components['hand-tracking-controls'];
-    const rightComp = this.rightHandEl.components['hand-tracking-controls'];
-    if (!leftComp || !rightComp || !leftComp.controller || !rightComp.controller) return;
+//     const lThumb = leftJoints['thumb-tip'];
+//     const lIndex = leftJoints['index-finger-tip'];
+//     const rThumb = rightJoints['thumb-tip'];
+//     const rIndex = rightJoints['index-finger-tip'];
 
-    const leftJoints  = leftComp.controller.joints;
-    const rightJoints = rightComp.controller.joints;
-    if (!leftJoints || !rightJoints) {
-      if (!this._loggedNoJoints) {
-        console.warn('[triangle-selector] No joints available yet.');
-        this._loggedNoJoints = true;
-      }
-      if (this.previewEl) this.previewEl.setAttribute('visible', 'false');
-      this.gestureActive = false;
-      return;
-    }
+//     if (!lThumb || !lIndex || !rThumb || !rIndex) {
+//       if (this.previewEl) this.previewEl.setAttribute('visible', 'false');
+//       return;
+//     }
 
-    const lThumb = leftJoints['thumb-tip'];
-    const lIndex = leftJoints['index-finger-tip'];
-    const rThumb = rightJoints['thumb-tip'];
-    const rIndex = rightJoints['index-finger-tip'];
+//     // Distances thumb–index for each hand = pinch check
+//     const pinchDistL = lThumb.position.distanceTo(lIndex.position);
+//     const pinchDistR = rThumb.position.distanceTo(rIndex.position);
 
-    if (!lThumb || !lIndex || !rThumb || !rIndex) {
-      if (this.previewEl) this.previewEl.setAttribute('visible', 'false');
-      this.gestureActive = false;
-      return;
-    }
+//     // Midpoints of each hand's pinch (world space)
+//     this.leftCenter
+//       .copy(lThumb.position)
+//       .add(lIndex.position)
+//       .multiplyScalar(0.5);
 
-    const pinchDistL = lThumb.position.distanceTo(lIndex.position);
-    const pinchDistR = rThumb.position.distanceTo(rIndex.position);
+//     this.rightCenter
+//       .copy(rThumb.position)
+//       .add(rIndex.position)
+//       .multiplyScalar(0.5);
 
-    this.leftCenter
-      .copy(lThumb.position)
-      .add(lIndex.position)
-      .multiplyScalar(0.5);
+//     // Distance between hands
+//     const handsDist = this.leftCenter.distanceTo(this.rightCenter);
 
-    this.rightCenter
-      .copy(rThumb.position)
-      .add(rIndex.position)
-      .multiplyScalar(0.5);
+//     const bothPinching =
+//       pinchDistL < this.data.pinchDistance &&
+//       pinchDistR < this.data.pinchDistance;
 
-    const handsDist = this.leftCenter.distanceTo(this.rightCenter);
+//     const handsTriangleLike =
+//       handsDist > this.data.minHandsDistance &&
+//       handsDist < this.data.maxHandsDistance;
 
-    const bothPinching =
-      pinchDistL < this.data.pinchDistance &&
-      pinchDistR < this.data.pinchDistance;
+//     if (bothPinching && handsTriangleLike) {
+//       this.holdSoFar += delta;
 
-    const handsTriangleLike =
-      handsDist > this.data.minHandsDistance &&
-      handsDist < this.data.maxHandsDistance;
+//       // Triangle center = midpoint between both hand centers
+//       this.triangleCenter
+//         .copy(this.leftCenter)
+//         .add(this.rightCenter)
+//         .multiplyScalar(0.5);
 
-    const gestureNow = bothPinching && handsTriangleLike;
+//       // --- Update preview position & orientation ---
+//       if (this.previewEl) {
+//         this.previewEl.setAttribute(
+//           'position',
+//           `${this.triangleCenter.x} ${this.triangleCenter.y} ${this.triangleCenter.z}`
+//         );
 
-    // Debug: log when gesture turns on/off
-    if (gestureNow && !this.gestureActive) {
-      console.log(
-        '[triangle-selector] gesture START',
-        'pinchL:', pinchDistL.toFixed(3),
-        'pinchR:', pinchDistR.toFixed(3),
-        'handsDist:', handsDist.toFixed(3)
-      );
-    } else if (!gestureNow && this.gestureActive) {
-      console.log('[triangle-selector] gesture END');
-    }
-    this.gestureActive = gestureNow;
+//         // Face the camera
+//         const cameraEl = this.scene.camera && this.scene.camera.el;
+//         if (cameraEl && cameraEl.object3D && this.previewEl.object3D) {
+//           cameraEl.object3D.getWorldPosition(this.tempLook);
+//           this.previewEl.object3D.lookAt(this.tempLook);
+//         }
 
-    if (gestureNow) {
-      this.holdSoFar += delta;
+//         this.previewEl.setAttribute('visible', 'true');
+//       }
 
-      // center between hands
-      this.triangleCenter
-        .copy(this.leftCenter)
-        .add(this.rightCenter)
-        .multiplyScalar(0.5);
+//       const enoughHold = this.holdSoFar >= this.data.holdMs;
+//       const cooledDown = (time - this.lastTriggerTime) >= this.data.cooldownMs;
 
-      // Update preview circle position + orientation
-      if (this.previewEl) {
-        this.previewEl.setAttribute(
-          'position',
-          `${this.triangleCenter.x} ${this.triangleCenter.y} ${this.triangleCenter.z}`
-        );
+//       if (enoughHold && cooledDown) {
+//         this.lastTriggerTime = time;
 
-        const cameraEl = this.scene.camera && this.scene.camera.el;
-        if (cameraEl && cameraEl.object3D && this.previewEl.object3D) {
-          cameraEl.object3D.getWorldPosition(this.tempLook);
-          this.previewEl.object3D.lookAt(this.tempLook);
-        }
+//         // Perform selection
+//         this.selectClosestClickable(this.triangleCenter);
 
-        this.previewEl.setAttribute('visible', 'true');
-      }
+//         // Emit event for any extra hooks
+//         this.el.emit('triangle-select', {
+//           position: this.triangleCenter.clone()
+//         });
+//       }
+//     } else {
+//       // Reset when gesture breaks
+//       this.holdSoFar = 0;
+//       if (this.previewEl) this.previewEl.setAttribute('visible', 'false');
+//     }
+//   },
 
-      const enoughHold = this.holdSoFar >= this.data.holdMs;
-      const cooledDown = (time - this.lastTriggerTime) >= this.data.cooldownMs;
+//   selectClosestClickable(worldPoint) {
+//     if (!this.scene) return;
 
-      if (enoughHold && cooledDown) {
-        this.lastTriggerTime = time;
+//     const clickables = this.scene.querySelectorAll('.clickable');
+//     if (!clickables.length) return;
 
-        this.selectClosestClickable(this.triangleCenter);
+//     let closestEl = null;
+//     let closestDist = Infinity;
 
-        this.el.emit('triangle-select', {
-          position: this.triangleCenter.clone()
-        });
-      }
-    } else {
-      this.holdSoFar = 0;
-      if (this.previewEl) this.previewEl.setAttribute('visible', 'false');
-    }
-  },
+//     clickables.forEach(el => {
+//       if (!el.object3D) return;
 
-  selectClosestClickable(worldPoint) {
-    if (!this.scene) return;
+//       el.object3D.getWorldPosition(this.tempPos);
+//       const d = this.tempPos.distanceTo(worldPoint);
 
-    const clickables = this.scene.querySelectorAll('.clickable');
-    if (!clickables.length) return;
+//       if (d < closestDist) {
+//         closestDist = d;
+//         closestEl = el;
+//       }
+//     });
 
-    let closestEl = null;
-    let closestDist = Infinity;
+//     if (closestEl && closestDist <= this.data.selectionRadius) {
+//       closestEl.emit(
+//         'click',
+//         {
+//           source: 'triangle-selector',
+//           position: worldPoint.clone()
+//         },
+//         false
+//       );
+//       console.log('Triangle-select clicked:', closestEl.id || closestEl);
+//     }
+//   }
+// });
 
-    clickables.forEach(el => {
-      if (!el.object3D) return;
-
-      el.object3D.getWorldPosition(this.tempPos);
-      const d = this.tempPos.distanceTo(worldPoint);
-
-      if (d < closestDist) {
-        closestDist = d;
-        closestEl = el;
-      }
-    });
-
-    if (closestEl && closestDist <= this.data.selectionRadius) {
-      closestEl.emit(
-        'click',
-        {
-          source: 'triangle-selector',
-          position: worldPoint.clone()
-        },
-        false
-      );
-      console.log('Triangle-select clicked:', closestEl.id || closestEl);
-    }
-  }
-});
 
 
 /* ======================================================
@@ -748,3 +729,115 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
 });
+
+// ===============================
+// Two-hand select with center glow
+// ===============================
+AFRAME.registerComponent('two-hand-select-circle', {
+  init() {
+    const scene = this.el.sceneEl;
+    this.scene = scene;
+
+    // Find hands & camera
+    this.leftHand = scene.querySelector('#leftHand');
+    this.rightHand = scene.querySelector('#rightHand');
+    this.camera = scene.querySelector('a-camera');
+
+    this.leftPinching = false;
+    this.rightPinching = false;
+    this.wasActive = false;
+
+    // --- Create the glowing circle preview, attached to the camera ---
+    this.preview = document.createElement('a-entity');
+    this.preview.setAttribute('geometry', 'primitive: circle; radius: 0.12');
+    this.preview.setAttribute(
+      'material',
+      'color: #00ffff; shader: flat; opacity: 0.35; side: double; transparent: true'
+    );
+    this.preview.setAttribute('visible', 'false');
+    this.preview.setAttribute(
+      'animation__pulse',
+      'property: scale; dir: alternate; dur: 400; loop: true; from: 1 1 1; to: 1.2 1.2 1.2'
+    );
+
+    if (this.camera) {
+      // Put it right in front of the view
+      this.camera.appendChild(this.preview);
+      this.preview.setAttribute('position', '0 0 -1.2');
+    } else {
+      // Fallback if camera not found yet
+      scene.appendChild(this.preview);
+      this.preview.setAttribute('position', '0 1.6 -1.5');
+    }
+
+    // --- Listen for pinch events from hand-tracking-controls ---
+    const addPinchListeners = (handEl, side) => {
+      if (!handEl) return;
+      handEl.addEventListener('pinchstarted', () => {
+        if (side === 'left') this.leftPinching = true;
+        else this.rightPinching = true;
+      });
+      handEl.addEventListener('pinchended', () => {
+        if (side === 'left') this.leftPinching = false;
+        else this.rightPinching = false;
+      });
+    };
+
+    addPinchListeners(this.leftHand, 'left');
+    addPinchListeners(this.rightHand, 'right');
+  },
+
+  tick() {
+    const scene = this.scene;
+    if (!scene) return;
+
+    // Only do this in XR mode
+    if (!scene.is('vr-mode')) {
+      if (this.preview) this.preview.setAttribute('visible', 'false');
+      this.wasActive = false;
+      return;
+    }
+
+    const active = this.leftPinching && this.rightPinching;
+
+    if (this.preview) {
+      this.preview.setAttribute('visible', active ? 'true' : 'false');
+    }
+
+    // When gesture just became active, trigger selection once
+    if (active && !this.wasActive) {
+      this.triggerSelection();
+    }
+    this.wasActive = active;
+  },
+
+  triggerSelection() {
+    if (!this.camera) return;
+
+    // Use the existing cursor's raycaster on the camera
+    const cursor = this.camera.querySelector('[raycaster]');
+    const rc = cursor && cursor.components && cursor.components.raycaster;
+    if (!rc) return;
+
+    const intersections = rc.intersections || [];
+    if (!intersections.length) return;
+
+    // Try to get the A-Frame element that was hit
+    const hit = intersections[0];
+    let target = null;
+
+    if (hit.object && hit.object.el) {
+      target = hit.object.el;
+    } else if (hit.el) {
+      target = hit.el;
+    } else if (hit.object && hit.object.parent && hit.object.parent.el) {
+      target = hit.object.parent.el;
+    }
+
+    if (target) {
+      // Simulate a click on whatever you're pointing at
+      target.emit('click');
+    }
+  }
+});
+
