@@ -105,7 +105,7 @@ AFRAME.registerComponent('triangle-selector', {
     maxHandsDistance:   { type: 'number', default: 0.25 }, // max distance between hand centers
     holdMs:             { type: 'number', default: 150 },  // how long both-hands-pinch must be held (ms)
     cooldownMs:         { type: 'number', default: 800 },  // delay between triggers (ms)
-    selectionRadius:    { type: 'number', default: 0.35 }  // how far from the triangle center we search for objects
+    selectionRadius:    { type: 'number', default: 0.35 }  // radius around triangle center for selecting clickables
   },
 
   init() {
@@ -117,18 +117,51 @@ AFRAME.registerComponent('triangle-selector', {
     this.holdSoFar = 0;
     this.lastTriggerTime = -Infinity;
 
-    // Reusable vectors to avoid GC churn
+    // Reusable vectors
     this.leftCenter = new THREE.Vector3();
     this.rightCenter = new THREE.Vector3();
     this.triangleCenter = new THREE.Vector3();
     this.tempPos = new THREE.Vector3();
+    this.tempLook = new THREE.Vector3();
+
+    // --- Create subtle glowing triangle preview ---
+    this.previewEl = document.createElement('a-entity');
+
+    // A small triangle shape in local space
+    this.previewEl.setAttribute(
+      'geometry',
+      'primitive: triangle; vertexA: -0.05 -0.05 0; vertexB: 0.05 -0.05 0; vertexC: 0 0.06 0'
+    );
+
+    // Glowing, semi-transparent material
+    this.previewEl.setAttribute(
+      'material',
+      'shader: standard; color: #00ffff; emissive: #00ffff; emissiveIntensity: 0.7; ' +
+      'opacity: 0.4; transparent: true; metalness: 0; roughness: 1'
+    );
+
+    // Gentle pulsing animation
+    this.previewEl.setAttribute(
+      'animation__pulse',
+      'property: scale; dir: alternate; dur: 600; easing: easeInOutSine; loop: true; ' +
+      'from: 0.85 0.85 0.85; to: 1.05 1.05 1.05'
+    );
+
+    this.previewEl.setAttribute('visible', 'false');
+
+    // Attach to scene (or world-root if you prefer)
+    if (this.scene) {
+      this.scene.appendChild(this.previewEl);
+    }
   },
 
   tick(time, delta) {
-    // Only run when in XR mode
-    if (!this.scene || !this.scene.is('vr-mode')) return;
+    if (!this.scene || !this.scene.is('vr-mode')) {
+      if (this.previewEl) this.previewEl.setAttribute('visible', 'false');
+      return;
+    }
 
-    // Lazy-resolve hand entities
+    // Lazy-resolve hands
     if (!this.leftHandEl)  this.leftHandEl  = this.scene.querySelector('#leftHand');
     if (!this.rightHandEl) this.rightHandEl = this.scene.querySelector('#rightHand');
     if (!this.leftHandEl || !this.rightHandEl) return;
@@ -146,13 +179,16 @@ AFRAME.registerComponent('triangle-selector', {
     const rThumb = rightJoints['thumb-tip'];
     const rIndex = rightJoints['index-finger-tip'];
 
-    if (!lThumb || !lIndex || !rThumb || !rIndex) return;
+    if (!lThumb || !lIndex || !rThumb || !rIndex) {
+      if (this.previewEl) this.previewEl.setAttribute('visible', 'false');
+      return;
+    }
 
     // Distances thumb–index for each hand = pinch check
     const pinchDistL = lThumb.position.distanceTo(lIndex.position);
     const pinchDistR = rThumb.position.distanceTo(rIndex.position);
 
-    // Midpoints of each hand's pinch
+    // Midpoints of each hand's pinch (world space)
     this.leftCenter
       .copy(lThumb.position)
       .add(lIndex.position)
@@ -177,29 +213,47 @@ AFRAME.registerComponent('triangle-selector', {
     if (bothPinching && handsTriangleLike) {
       this.holdSoFar += delta;
 
+      // Triangle center = midpoint between both hand centers
+      this.triangleCenter
+        .copy(this.leftCenter)
+        .add(this.rightCenter)
+        .multiplyScalar(0.5);
+
+      // --- Update preview position & orientation ---
+      if (this.previewEl) {
+        this.previewEl.setAttribute(
+          'position',
+          `${this.triangleCenter.x} ${this.triangleCenter.y} ${this.triangleCenter.z}`
+        );
+
+        // Face the camera
+        const cameraEl = this.scene.camera && this.scene.camera.el;
+        if (cameraEl && cameraEl.object3D && this.previewEl.object3D) {
+          cameraEl.object3D.getWorldPosition(this.tempLook);
+          this.previewEl.object3D.lookAt(this.tempLook);
+        }
+
+        this.previewEl.setAttribute('visible', 'true');
+      }
+
       const enoughHold = this.holdSoFar >= this.data.holdMs;
       const cooledDown = (time - this.lastTriggerTime) >= this.data.cooldownMs;
 
       if (enoughHold && cooledDown) {
         this.lastTriggerTime = time;
 
-        // Triangle center = midpoint between the two midpoints
-        this.triangleCenter
-          .copy(this.leftCenter)
-          .add(this.rightCenter)
-          .multiplyScalar(0.5);
-
-        // Fire selection
+        // Perform selection
         this.selectClosestClickable(this.triangleCenter);
 
-        // For debugging / future hooks
+        // Emit event for any extra hooks
         this.el.emit('triangle-select', {
           position: this.triangleCenter.clone()
         });
       }
     } else {
-      // Reset hold time when gesture breaks
+      // Reset when gesture breaks
       this.holdSoFar = 0;
+      if (this.previewEl) this.previewEl.setAttribute('visible', 'false');
     }
   },
 
@@ -225,7 +279,6 @@ AFRAME.registerComponent('triangle-selector', {
     });
 
     if (closestEl && closestDist <= this.data.selectionRadius) {
-      // Simulate a click on that entity
       closestEl.emit(
         'click',
         {
@@ -234,80 +287,10 @@ AFRAME.registerComponent('triangle-selector', {
         },
         false
       );
-      // Optional: log for debugging
       console.log('Triangle-select clicked:', closestEl.id || closestEl);
     }
   }
 });
-
-
-// AFRAME.registerComponent('custom-gesture', {
-//   schema: {
-//     hand: { type: 'string', default: 'right' } // just for logging
-//   },
-
-//   init() {
-//     this.lastGesture = null;
-//     this.tempVec = new THREE.Vector3();
-//   },
-
-//   tick() {
-//     // Only bother when in XR
-//     const sceneEl = this.el.sceneEl;
-//     if (!sceneEl || !sceneEl.is('vr-mode')) return;
-
-//     // Get the underlying hand-tracking controller
-//     const comp = this.el.components['hand-tracking-controls'];
-//     if (!comp || !comp.controller) return;
-
-//     const controller = comp.controller;
-//     const joints = controller.joints;
-//     if (!joints) return;
-
-//     // Grab some key joints
-//     const thumbTip = joints['thumb-tip'];
-//     const indexTip = joints['index-finger-tip'];
-//     const wrist    = joints['wrist'];
-
-//     if (!thumbTip || !indexTip || !wrist) return;
-
-//     // Positions (already in world space for WebXRController joints)
-//     const thumbPos = thumbTip.position;
-//     const indexPos = indexTip.position;
-//     const wristPos = wrist.position;
-
-//     // Distances
-//     const thumbIndexDist = thumbPos.distanceTo(indexPos);
-//     const indexWristDist = indexPos.distanceTo(wristPos);
-
-//     // --- Very simple gesture classification ---
-//     let gesture = 'open';
-
-//     // Small distance between thumb & index → pinch
-//     if (thumbIndexDist < 0.02) {
-//       gesture = 'pinch';
-//     }
-//     // Not pinching + index far from wrist → "point"
-//     else if (indexWristDist > 0.07) {
-//       gesture = 'point';
-//     }
-
-//     // If gesture changed, emit an event
-//     if (gesture !== this.lastGesture) {
-//       this.lastGesture = gesture;
-//       console.log(this.data.hand, 'gesture:', gesture);
-
-//       this.el.emit('gesture-changed', { gesture });
-
-//       // Optional: emit more specific events you can listen to
-//       if (gesture === 'point') {
-//         this.el.emit('gesture-point');
-//       } else if (gesture === 'pinch') {
-//         this.el.emit('gesture-pinch');
-//       }
-//     }
-//   }
-// });
 
 
 /* ======================================================
