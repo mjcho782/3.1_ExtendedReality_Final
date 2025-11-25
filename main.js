@@ -122,27 +122,34 @@ AFRAME.registerComponent('ghost-wander', {
   scheduleNextMove() {
     const el = this.el;
     const obj = el.object3D;
-
+  
     const currentPos = obj.position;
-
-    // Pick a random direction and distance within radius
-    const angle = Math.random() * Math.PI * 2;
-    const dist  = Math.random() * this.data.radius;
-
-    const targetX = currentPos.x + Math.cos(angle) * dist;
-    const targetZ = currentPos.z + Math.sin(angle) * dist;
-    const targetY = this.data.minY + Math.random() * (this.data.maxY - this.data.minY);
-
+    
+  
+    // If room bounds not ready, fallback to radius
+    const roomBox = window.__ROOM_BOUNDING_BOX__;
+    if (!roomBox) {
+      console.warn("Room bounds not ready, ghost using radius wandering.");
+      this.wanderByRadius(currentPos);
+      return;
+    }
+  
+    // Pick a random point inside room bounds
+    const targetX = THREE.MathUtils.lerp(roomBox.min.x, roomBox.max.x, Math.random());
+    const targetZ = THREE.MathUtils.lerp(roomBox.min.z, roomBox.max.z, Math.random());
+    const targetY = THREE.MathUtils.lerp(roomBox.min.y + 0.5, roomBox.max.y - 0.2, Math.random());
+  
     const toStr = `${targetX} ${targetY} ${targetZ}`;
-
+  
+    // Move animation
     el.setAttribute('animation__move', {
       property: 'position',
       to: toStr,
       dur: this.data.moveDuration,
       easing: 'easeInOutSine'
     });
-
-    // Optional: slow rotation spin for extra spook
+  
+    // Slow spin
     el.setAttribute('animation__spin', {
       property: 'rotation',
       dur: this.data.moveDuration * 2,
@@ -151,6 +158,24 @@ AFRAME.registerComponent('ghost-wander', {
       to: `0 ${Math.random() < 0.5 ? -360 : 360} 0`
     });
   },
+
+  wanderByRadius(currentPos) {
+    const angle = Math.random() * Math.PI * 2;
+    const dist = Math.random() * this.data.radius;
+  
+    const targetX = currentPos.x + Math.cos(angle) * dist;
+    const targetZ = currentPos.z + Math.sin(angle) * dist;
+    const targetY = this.data.minY + Math.random() * (this.data.maxY - this.data.minY);
+  
+    const toStr = `${targetX} ${targetY} ${targetZ}`;
+  
+    this.el.setAttribute('animation__move', {
+      property: 'position',
+      to: toStr,
+      dur: this.data.moveDuration,
+      easing: 'easeInOutSine'
+    });
+  },  
 
   onMoveComplete() {
     // Little pause, then move again
@@ -367,6 +392,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const modelRoot =
           (e.detail && e.detail.model) || roomEntity.getObject3D('mesh');
+          // --- Compute room bounding box ---
+        const box = new THREE.Box3().setFromObject(modelRoot);
+
+        // Save globally for ghost-wander later
+        window.__ROOM_BOUNDING_BOX__ = box;
+
+        console.log("Room bounding box:", box.min, box.max);
+
         if (!modelRoot) return;
 
         // Group meshes by their parent node (layer/group in GLB)
