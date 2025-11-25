@@ -100,12 +100,12 @@ AFRAME.registerComponent('hover-highlight', {
 
 AFRAME.registerComponent('triangle-selector', {
   schema: {
-    pinchDistance:      { type: 'number', default: 0.02 }, // meters thumb–index for pinch
-    minHandsDistance:   { type: 'number', default: 0.06 }, // min distance between hand centers
-    maxHandsDistance:   { type: 'number', default: 0.25 }, // max distance between hand centers
-    holdMs:             { type: 'number', default: 150 },  // how long both-hands-pinch must be held (ms)
-    cooldownMs:         { type: 'number', default: 800 },  // delay between triggers (ms)
-    selectionRadius:    { type: 'number', default: 0.35 }  // radius around triangle center for selecting clickables
+    pinchDistance:      { type: 'number', default: 0.03 }, // easier pinch detection
+    minHandsDistance:   { type: 'number', default: 0.05 }, // easier distance range
+    maxHandsDistance:   { type: 'number', default: 0.50 },
+    holdMs:             { type: 'number', default: 150 },
+    cooldownMs:         { type: 'number', default: 800 },
+    selectionRadius:    { type: 'number', default: 0.40 }  // slightly larger selection bubble
   },
 
   init() {
@@ -117,6 +117,8 @@ AFRAME.registerComponent('triangle-selector', {
     this.holdSoFar = 0;
     this.lastTriggerTime = -Infinity;
 
+    this.gestureActive = false; // for debug state changes
+
     // Reusable vectors
     this.leftCenter = new THREE.Vector3();
     this.rightCenter = new THREE.Vector3();
@@ -124,40 +126,41 @@ AFRAME.registerComponent('triangle-selector', {
     this.tempPos = new THREE.Vector3();
     this.tempLook = new THREE.Vector3();
 
-    // --- Create subtle glowing triangle preview ---
+    // --- Glowing circle preview in the middle ---
     this.previewEl = document.createElement('a-entity');
 
-    // A small triangle shape in local space
+    // Circle instead of triangle
     this.previewEl.setAttribute(
       'geometry',
-      'primitive: triangle; vertexA: -0.05 -0.05 0; vertexB: 0.05 -0.05 0; vertexC: 0 0.06 0'
+      'primitive: circle; radius: 0.08; segments: 32'
     );
 
-    // Glowing, semi-transparent material
     this.previewEl.setAttribute(
       'material',
-      'shader: standard; color: #00ffff; emissive: #00ffff; emissiveIntensity: 0.7; ' +
+      'shader: standard; color: #00ffff; emissive: #00ffff; emissiveIntensity: 0.9; ' +
       'opacity: 0.4; transparent: true; metalness: 0; roughness: 1'
     );
 
-    // Gentle pulsing animation
+    // Gentle pulsing
     this.previewEl.setAttribute(
       'animation__pulse',
       'property: scale; dir: alternate; dur: 600; easing: easeInOutSine; loop: true; ' +
-      'from: 0.85 0.85 0.85; to: 1.05 1.05 1.05'
+      'from: 0.9 0.9 0.9; to: 1.1 1.1 1.1'
     );
 
     this.previewEl.setAttribute('visible', 'false');
 
-    // Attach to scene (or world-root if you prefer)
     if (this.scene) {
       this.scene.appendChild(this.previewEl);
     }
+
+    this._loggedNoJoints = false;
   },
 
   tick(time, delta) {
     if (!this.scene || !this.scene.is('vr-mode')) {
       if (this.previewEl) this.previewEl.setAttribute('visible', 'false');
+      this.gestureActive = false;
       return;
     }
 
@@ -172,7 +175,15 @@ AFRAME.registerComponent('triangle-selector', {
 
     const leftJoints  = leftComp.controller.joints;
     const rightJoints = rightComp.controller.joints;
-    if (!leftJoints || !rightJoints) return;
+    if (!leftJoints || !rightJoints) {
+      if (!this._loggedNoJoints) {
+        console.warn('[triangle-selector] No joints available yet.');
+        this._loggedNoJoints = true;
+      }
+      if (this.previewEl) this.previewEl.setAttribute('visible', 'false');
+      this.gestureActive = false;
+      return;
+    }
 
     const lThumb = leftJoints['thumb-tip'];
     const lIndex = leftJoints['index-finger-tip'];
@@ -181,14 +192,13 @@ AFRAME.registerComponent('triangle-selector', {
 
     if (!lThumb || !lIndex || !rThumb || !rIndex) {
       if (this.previewEl) this.previewEl.setAttribute('visible', 'false');
+      this.gestureActive = false;
       return;
     }
 
-    // Distances thumb–index for each hand = pinch check
     const pinchDistL = lThumb.position.distanceTo(lIndex.position);
     const pinchDistR = rThumb.position.distanceTo(rIndex.position);
 
-    // Midpoints of each hand's pinch (world space)
     this.leftCenter
       .copy(lThumb.position)
       .add(lIndex.position)
@@ -199,7 +209,6 @@ AFRAME.registerComponent('triangle-selector', {
       .add(rIndex.position)
       .multiplyScalar(0.5);
 
-    // Distance between hands
     const handsDist = this.leftCenter.distanceTo(this.rightCenter);
 
     const bothPinching =
@@ -210,23 +219,37 @@ AFRAME.registerComponent('triangle-selector', {
       handsDist > this.data.minHandsDistance &&
       handsDist < this.data.maxHandsDistance;
 
-    if (bothPinching && handsTriangleLike) {
+    const gestureNow = bothPinching && handsTriangleLike;
+
+    // Debug: log when gesture turns on/off
+    if (gestureNow && !this.gestureActive) {
+      console.log(
+        '[triangle-selector] gesture START',
+        'pinchL:', pinchDistL.toFixed(3),
+        'pinchR:', pinchDistR.toFixed(3),
+        'handsDist:', handsDist.toFixed(3)
+      );
+    } else if (!gestureNow && this.gestureActive) {
+      console.log('[triangle-selector] gesture END');
+    }
+    this.gestureActive = gestureNow;
+
+    if (gestureNow) {
       this.holdSoFar += delta;
 
-      // Triangle center = midpoint between both hand centers
+      // center between hands
       this.triangleCenter
         .copy(this.leftCenter)
         .add(this.rightCenter)
         .multiplyScalar(0.5);
 
-      // --- Update preview position & orientation ---
+      // Update preview circle position + orientation
       if (this.previewEl) {
         this.previewEl.setAttribute(
           'position',
           `${this.triangleCenter.x} ${this.triangleCenter.y} ${this.triangleCenter.z}`
         );
 
-        // Face the camera
         const cameraEl = this.scene.camera && this.scene.camera.el;
         if (cameraEl && cameraEl.object3D && this.previewEl.object3D) {
           cameraEl.object3D.getWorldPosition(this.tempLook);
@@ -242,16 +265,13 @@ AFRAME.registerComponent('triangle-selector', {
       if (enoughHold && cooledDown) {
         this.lastTriggerTime = time;
 
-        // Perform selection
         this.selectClosestClickable(this.triangleCenter);
 
-        // Emit event for any extra hooks
         this.el.emit('triangle-select', {
           position: this.triangleCenter.clone()
         });
       }
     } else {
-      // Reset when gesture breaks
       this.holdSoFar = 0;
       if (this.previewEl) this.previewEl.setAttribute('visible', 'false');
     }
