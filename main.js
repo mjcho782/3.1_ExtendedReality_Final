@@ -3,7 +3,7 @@
 import 'aframe';
 
 const THREE = window.AFRAME && window.AFRAME.THREE ? window.AFRAME.THREE : window.THREE;
-const GHOST_SCALE = 3.0;
+const GHOST_SCALE = 0.5;
 
 /**
  * Hover highlight component (from old project, adapted)
@@ -485,8 +485,17 @@ document.addEventListener('DOMContentLoaded', () => {
               `${GHOST_SCALE} ${GHOST_SCALE} ${GHOST_SCALE}`
             );
 
-            const eulerG = new THREE.Euler().setFromQuaternion(worldQuat, 'YXZ');
-            const rotY = THREE.MathUtils.radToDeg(eulerG.y);
+            let rotY = 0;
+            const cameraEl = scene.camera && scene.camera.el;
+            if (cameraEl && cameraEl.object3D) {
+              const camPos = new THREE.Vector3();
+              cameraEl.object3D.getWorldPosition(camPos);
+              const dirToCamera = new THREE.Vector3().subVectors(camPos, worldPos);
+              rotY = THREE.MathUtils.radToDeg(Math.atan2(dirToCamera.x, dirToCamera.z));
+            } else {
+              const eulerFallback = new THREE.Euler().setFromQuaternion(worldQuat, 'YXZ');
+              rotY = THREE.MathUtils.radToDeg(eulerFallback.y);
+            }
             ghost.setAttribute('rotation', `0 ${rotY} 0`);
 
             const riseTo = `${worldPos.x} ${worldPos.y + 2} ${worldPos.z}`;
