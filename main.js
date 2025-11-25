@@ -731,7 +731,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ===============================
-// Two-hand select with center glow (triangle-based)
+// Two-hand select with center glow
 // ===============================
 AFRAME.registerComponent('two-hand-select-circle', {
   init() {
@@ -739,17 +739,13 @@ AFRAME.registerComponent('two-hand-select-circle', {
     this.scene = scene;
 
     // Find hands & camera
-    this.leftHand  = scene.querySelector('#leftHand');
+    this.leftHand = scene.querySelector('#leftHand');
     this.rightHand = scene.querySelector('#rightHand');
-    this.camera    = scene.querySelector('a-camera');
+    this.camera = scene.querySelector('a-camera');
 
-    // Pinch flags from events
-    this.leftPinching  = false;
+    this.leftPinching = false;
     this.rightPinching = false;
-
-    // Track previous selection state so we only click on rising edge
-    this.wasSelectionActive = false;
-    this.wasTriangleActive  = false;
+    this.wasActive = false;
 
     // --- Create the glowing circle preview, attached to the camera ---
     this.preview = document.createElement('a-entity');
@@ -765,9 +761,11 @@ AFRAME.registerComponent('two-hand-select-circle', {
     );
 
     if (this.camera) {
+      // Put it right in front of the view
       this.camera.appendChild(this.preview);
       this.preview.setAttribute('position', '0 0 -1.2');
     } else {
+      // Fallback if camera not found yet
       scene.appendChild(this.preview);
       this.preview.setAttribute('position', '0 1.6 -1.5');
     }
@@ -787,54 +785,6 @@ AFRAME.registerComponent('two-hand-select-circle', {
 
     addPinchListeners(this.leftHand, 'left');
     addPinchListeners(this.rightHand, 'right');
-
-    // Reusable vectors for triangle detection
-    this._leftWristPos  = new THREE.Vector3();
-    this._rightWristPos = new THREE.Vector3();
-  },
-
-  // Detect "triangle-ish" pose using wrist distance & height similarity
-  isTriangleFormed() {
-    if (!this.leftHand || !this.rightHand) return false;
-
-    const leftComp  = this.leftHand.components['hand-tracking-controls'];
-    const rightComp = this.rightHand.components['hand-tracking-controls'];
-    if (!leftComp || !rightComp || !leftComp.controller || !rightComp.controller) return false;
-
-    const leftJoints  = leftComp.controller.joints;
-    const rightJoints = rightComp.controller.joints;
-    if (!leftJoints || !rightJoints) return false;
-
-    const lWrist = leftJoints['wrist'];
-    const rWrist = rightJoints['wrist'];
-    if (!lWrist || !rWrist) return false;
-
-    // World-space wrist positions
-    this._leftWristPos.copy(lWrist.position);
-    this._rightWristPos.copy(rWrist.position);
-
-    const dist = this._leftWristPos.distanceTo(this._rightWristPos);
-    const dy   = Math.abs(this._leftWristPos.y - this._rightWristPos.y);
-
-    // Tune these as needed:
-    // - hands not too close, not too far
-    // - roughly same height
-    const minDist = 0.15;
-    const maxDist = 0.60;
-    const maxHeightDiff = 0.18;
-
-    const triangleLike = (dist > minDist && dist < maxDist && dy < maxHeightDiff);
-
-    // Optional debug edge logs
-    if (triangleLike && !this.wasTriangleActive) {
-      console.log('[two-hand-select-circle] triangle START (dist:',
-                  dist.toFixed(3), 'dy:', dy.toFixed(3), ')');
-    } else if (!triangleLike && this.wasTriangleActive) {
-      console.log('[two-hand-select-circle] triangle END');
-    }
-    this.wasTriangleActive = triangleLike;
-
-    return triangleLike;
   },
 
   tick() {
@@ -844,26 +794,21 @@ AFRAME.registerComponent('two-hand-select-circle', {
     // Only do this in XR mode
     if (!scene.is('vr-mode')) {
       if (this.preview) this.preview.setAttribute('visible', 'false');
-      this.wasSelectionActive = false;
-      this.wasTriangleActive  = false;
+      this.wasActive = false;
       return;
     }
 
-    const triangleActive = this.isTriangleFormed();
-    const bothPinching   = this.leftPinching && this.rightPinching;
-    const selectionActive = triangleActive && bothPinching;
+    const active = this.leftPinching && this.rightPinching;
 
-    // Circle shows when triangle is formed (hands positioned), regardless of pinch
     if (this.preview) {
-      this.preview.setAttribute('visible', triangleActive ? 'true' : 'false');
+      this.preview.setAttribute('visible', active ? 'true' : 'false');
     }
 
-    // Click only when both-pinching WHILE triangle is formed
-    if (selectionActive && !this.wasSelectionActive) {
+    // When gesture just became active, trigger selection once
+    if (active && !this.wasActive) {
       this.triggerSelection();
     }
-
-    this.wasSelectionActive = selectionActive;
+    this.wasActive = active;
   },
 
   triggerSelection() {
@@ -877,6 +822,7 @@ AFRAME.registerComponent('two-hand-select-circle', {
     const intersections = rc.intersections || [];
     if (!intersections.length) return;
 
+    // Try to get the A-Frame element that was hit
     const hit = intersections[0];
     let target = null;
 
@@ -889,6 +835,7 @@ AFRAME.registerComponent('two-hand-select-circle', {
     }
 
     if (target) {
+      // Simulate a click on whatever you're pointing at
       target.emit('click');
     }
   }
