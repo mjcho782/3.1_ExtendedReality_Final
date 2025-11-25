@@ -98,6 +98,75 @@ AFRAME.registerComponent('hover-highlight', {
   }
 });
 
+AFRAME.registerComponent('custom-gesture', {
+  schema: {
+    hand: { type: 'string', default: 'right' } // just for logging
+  },
+
+  init() {
+    this.lastGesture = null;
+    this.tempVec = new THREE.Vector3();
+  },
+
+  tick() {
+    // Only bother when in XR
+    const sceneEl = this.el.sceneEl;
+    if (!sceneEl || !sceneEl.is('vr-mode')) return;
+
+    // Get the underlying hand-tracking controller
+    const comp = this.el.components['hand-tracking-controls'];
+    if (!comp || !comp.controller) return;
+
+    const controller = comp.controller;
+    const joints = controller.joints;
+    if (!joints) return;
+
+    // Grab some key joints
+    const thumbTip = joints['thumb-tip'];
+    const indexTip = joints['index-finger-tip'];
+    const wrist    = joints['wrist'];
+
+    if (!thumbTip || !indexTip || !wrist) return;
+
+    // Positions (already in world space for WebXRController joints)
+    const thumbPos = thumbTip.position;
+    const indexPos = indexTip.position;
+    const wristPos = wrist.position;
+
+    // Distances
+    const thumbIndexDist = thumbPos.distanceTo(indexPos);
+    const indexWristDist = indexPos.distanceTo(wristPos);
+
+    // --- Very simple gesture classification ---
+    let gesture = 'open';
+
+    // Small distance between thumb & index → pinch
+    if (thumbIndexDist < 0.02) {
+      gesture = 'pinch';
+    }
+    // Not pinching + index far from wrist → "point"
+    else if (indexWristDist > 0.07) {
+      gesture = 'point';
+    }
+
+    // If gesture changed, emit an event
+    if (gesture !== this.lastGesture) {
+      this.lastGesture = gesture;
+      console.log(this.data.hand, 'gesture:', gesture);
+
+      this.el.emit('gesture-changed', { gesture });
+
+      // Optional: emit more specific events you can listen to
+      if (gesture === 'point') {
+        this.el.emit('gesture-point');
+      } else if (gesture === 'pinch') {
+        this.el.emit('gesture-pinch');
+      }
+    }
+  }
+});
+
+
 /* ======================================================
  * DOMContentLoaded: set up scene behaviours
  * ====================================================== */

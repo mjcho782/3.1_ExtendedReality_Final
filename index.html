@@ -92,18 +92,21 @@
       </a-entity>
 
     <!-- Hand tracking + raycasters to .clickable -->
+    <!-- Hand tracking + raycasters to .clickable -->
     <a-entity
-      id="leftHand"
-      hand-tracking-controls="hand: left"
-      raycaster="objects: .clickable; showLine: true; recursive: true">
+    id="leftHand"
+    hand-tracking-controls="hand: left"
+    raycaster="objects: .clickable; showLine: true; recursive: true"
+    custom-gesture="hand: left">
     </a-entity>
 
     <a-entity
-      id="rightHand"
-      hand-tracking-controls="hand: right"
-      raycaster="objects: .clickable; showLine: true; recursive: true"
-      position="0 0 0">
+    id="rightHand"
+    hand-tracking-controls="hand: right"
+    raycaster="objects: .clickable; showLine: true; recursive: true"
+    custom-gesture="hand: right">
     </a-entity>
+
 
     <!-- Rotated world content -->
     <a-entity id="world-root">
