@@ -32,29 +32,13 @@
         z-index: 9999;
       }
 
-      #detection-overlay {
-        position: fixed;
-        inset: 0;
-        pointer-events: none;
-        z-index: 5000; /* below intro overlay (9999), above scene */
-      }
     </style>
-
-    <!-- TF / COCO-SSD for camera object detection overlay (still kept) -->
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
 
     <!-- Vite / bundler entry (imports 'aframe' inside main.js) -->
     <script type="module" src="/main.js"></script>
   </head>
 
   <body>
-    <!-- Hidden camera feed (for object detection) -->
-    <video id="cameraFeed" autoplay playsinline style="display:none;"></video>
-
-    <!-- Overlay canvas for darkening boxes -->
-    <canvas id="detection-overlay"></canvas>
-
     <a-scene
       background="transparent"
       renderer="colorManagement: true; sortObjects: true; alpha: true"
