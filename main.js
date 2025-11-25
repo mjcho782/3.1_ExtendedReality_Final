@@ -147,56 +147,26 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
-    /* ===== 1B. HAND TRACKING → CLICK ===== */
+    function pressIntroButton() {
+      if (!btn) return false;
+      const introPanelVisible =
+        !introPanel || introPanel.getAttribute('visible') !== 'false';
+      if (!introPanelVisible) return false;
+      btn.emit('click');
+      return true;
+    }
+
+    /* ===== 1B. HAND TRACKING → INTRO BUTTON PINCH ===== */
     const rightHand = scene.querySelector('#rightHand');
     const leftHand = scene.querySelector('#leftHand');
-
-    // Raycast from camera centre, find first .clickable and emit 'click'
-    function clickCenterObject() {
-      const cameraEl = scene.camera && scene.camera.el;
-      if (!cameraEl || !scene.object3D) return;
-
-      const raycaster = new THREE.Raycaster();
-
-      // Origin: camera world position
-      const origin = new THREE.Vector3();
-      cameraEl.object3D.getWorldPosition(origin);
-
-      // Direction: camera forward (-Z in local space)
-      const direction = new THREE.Vector3(0, 0, -1);
-      const worldQuat = new THREE.Quaternion();
-      cameraEl.object3D.getWorldQuaternion(worldQuat);
-      direction.applyQuaternion(worldQuat).normalize();
-
-      raycaster.set(origin, direction);
-
-      const intersects = raycaster.intersectObjects(scene.object3D.children, true);
-
-      for (let i = 0; i < intersects.length; i++) {
-        const obj = intersects[i].object;
-        if (!obj) continue;
-
-        // Climb to A-Frame entity
-        let targetEl = obj.el;
-        let parentObj = obj.parent;
-        while (!targetEl && parentObj) {
-          targetEl = parentObj.el;
-          parentObj = parentObj.parent;
-        }
-
-        if (targetEl && targetEl.classList && targetEl.classList.contains('clickable')) {
-          console.log('Pinch → click on', targetEl.id || targetEl.tagName);
-          targetEl.emit('click');
-          return;
-        }
-      }
-    }
 
     function handlePinch(handEl, side) {
       if (!handEl) return;
       handEl.addEventListener('pinchstarted', () => {
-        console.log('Pinch started on', side, 'hand → casting ray from camera center');
-        clickCenterObject();
+        console.log('Pinch started on', side, 'hand → trying intro button');
+        if (!pressIntroButton()) {
+          console.log('Intro button not active; pinch ignored.');
+        }
       });
     }
 
@@ -325,6 +295,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * 1E. GLB SPLIT + GHOST SPAWN (old behaviour)
      * -------------------------------------- */
     const roomEntity = document.getElementById('roomEntity');
+    const worldContainer = document.getElementById('world-root');
 
     if (roomEntity) {
       const onModelLoaded = e => {
@@ -460,7 +431,7 @@ document.addEventListener('DOMContentLoaded', () => {
             createdParts.push(partEl);
           }
 
-          scene.appendChild(partEl);
+          (worldContainer || scene).appendChild(partEl);
         });
 
         console.log('[GLB Split] Created entities:', createdParts.length);
@@ -524,7 +495,7 @@ document.addEventListener('DOMContentLoaded', () => {
               `property: position; to: ${riseTo}; dur: 3000; easing: linear`
             );
 
-            scene.appendChild(ghost);
+            (worldContainer || scene).appendChild(ghost);
 
             setTimeout(() => {
               if (ghost.parentElement) ghost.parentElement.removeChild(ghost);

@@ -60,55 +60,59 @@
 
       <!-- Camera + cursor (ray from center; hits .clickable) -->
       <a-entity id="rig" position="0 0 0">
-        <a-camera position="0 1.6 0">
-          <a-entity
-            cursor="fuse: false"
-            raycaster="objects: .clickable; recursive: true"
-            position="0 0 -1"
-            geometry="primitive: ring; radiusInner: 0.01; radiusOuter: 0.015"
-            material="color: white; shader: flat">
+          <a-camera position="0 1.6 0">
+            <a-entity
+              cursor="fuse: false"
+              raycaster="objects: .clickable; recursive: true"
+              position="0 0 -1"
+              geometry="primitive: ring; radiusInner: 0.01; radiusOuter: 0.015"
+              material="color: white; shader: flat">
+            </a-entity>
+          </a-camera>
+          
+          <!-- Camera-relative intro panel (always centered in view) -->
+          <a-entity id="intro-panel" position="0 1.6 -1.5" rotation="0 0 0">
+            <a-plane
+              id="intro-image-3d"
+              width="1.8"
+              height="1.1"
+              material="src: #intro1; transparent: true; side: double">
+            </a-plane>
+
+            <a-plane
+              id="intro-button-3d"
+              class="clickable"
+              position="0 -0.9 0"
+              width="0.9"
+              height="0.3"
+              material="color: #2196F3"
+              text="value: Next; align: center; color: #FFFFFF; width: 2">
+            </a-plane>
           </a-entity>
-        </a-camera>
-        
-        <!-- Camera-relative intro panel (always centered in view) -->
-        <a-entity id="intro-panel" position="1 1.6 0" rotation="0 -90 0">
-        <a-plane
-          id="intro-image-3d"
-          width="1.8"
-          height="1.1"
-          material="src: #intro1; transparent: true; side: double">
-        </a-plane>
-
-        <a-plane
-          id="intro-button-3d"
-          class="clickable"
-          position="0 -0.9 0"
-          width="0.9"
-          height="0.3"
-          material="color: #2196F3"
-          text="value: Next; align: center; color: #FFFFFF; width: 2">
-        </a-plane>
       </a-entity>
 
-      <!-- Hand tracking + raycasters to .clickable -->
-      <a-entity
-        id="leftHand"
-        hand-tracking-controls="hand: left"
-        raycaster="objects: .clickable; showLine: true; recursive: true">
-      </a-entity>
+    <!-- Hand tracking + raycasters to .clickable -->
+    <a-entity
+      id="leftHand"
+      hand-tracking-controls="hand: left"
+      raycaster="objects: .clickable; showLine: true; recursive: true">
+    </a-entity>
 
-      <a-entity
-        id="rightHand"
-        hand-tracking-controls="hand: right"
-        raycaster="objects: .clickable; showLine: true; recursive: true"
-        position="0 0 0">
-      </a-entity>
+    <a-entity
+      id="rightHand"
+      hand-tracking-controls="hand: right"
+      raycaster="objects: .clickable; showLine: true; recursive: true"
+      position="0 0 0">
+    </a-entity>
 
+    <!-- Rotated world content -->
+    <a-entity id="world-root">
       <!-- Room model: will be auto-split into clickable parts by main.js -->
       <a-entity
         id="roomEntity"
         gltf-model="#room"
         position="0 0 0"
+        rotation="0 90 0"
         scale="1 1 1">
       </a-entity>
 
@@ -118,6 +122,7 @@
         light="type: directional; intensity: 0.9"
         position="0 4 -2">
       </a-entity>
+    </a-entity>
     </a-scene>
   </body>
 </html>
