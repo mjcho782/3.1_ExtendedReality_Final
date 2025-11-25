@@ -98,200 +98,65 @@ AFRAME.registerComponent('hover-highlight', {
   }
 });
 
-// AFRAME.registerComponent('triangle-selector', {
-//   schema: {
-//     pinchDistance:      { type: 'number', default: 0.02 }, // meters thumb–index for pinch
-//     minHandsDistance:   { type: 'number', default: 0.06 }, // min distance between hand centers
-//     maxHandsDistance:   { type: 'number', default: 0.25 }, // max distance between hand centers
-//     holdMs:             { type: 'number', default: 150 },  // how long both-hands-pinch must be held (ms)
-//     cooldownMs:         { type: 'number', default: 800 },  // delay between triggers (ms)
-//     selectionRadius:    { type: 'number', default: 0.35 }  // radius around triangle center for selecting clickables
-//   },
+AFRAME.registerComponent('ghost-wander', {
+  schema: {
+    radius:       { type: 'number', default: 2.0 },   // how far it can drift from current pos (in x/z)
+    minY:         { type: 'number', default: 0.5 },   // lower vertical bound
+    maxY:         { type: 'number', default: 2.5 },   // upper vertical bound
+    moveDuration: { type: 'number', default: 4500 },  // ms per move
+    pauseDuration:{ type: 'number', default: 500 }    // ms pause between moves
+  },
 
-//   init() {
-//     this.scene = this.el.sceneEl;
+  init() {
+    this._onMoveComplete = this.onMoveComplete.bind(this);
+    this.el.addEventListener('animationcomplete__move', this._onMoveComplete);
+    
+    // Start wandering after first frame so initial position is set
+    setTimeout(() => this.scheduleNextMove(), 50);
+  },
 
-//     this.leftHandEl = null;
-//     this.rightHandEl = null;
+  remove() {
+    this.el.removeEventListener('animationcomplete__move', this._onMoveComplete);
+  },
 
-//     this.holdSoFar = 0;
-//     this.lastTriggerTime = -Infinity;
+  scheduleNextMove() {
+    const el = this.el;
+    const obj = el.object3D;
 
-//     // Reusable vectors
-//     this.leftCenter = new THREE.Vector3();
-//     this.rightCenter = new THREE.Vector3();
-//     this.triangleCenter = new THREE.Vector3();
-//     this.tempPos = new THREE.Vector3();
-//     this.tempLook = new THREE.Vector3();
+    const currentPos = obj.position;
 
-//     // --- Create subtle glowing triangle preview ---
-//     this.previewEl = document.createElement('a-entity');
+    // Pick a random direction and distance within radius
+    const angle = Math.random() * Math.PI * 2;
+    const dist  = Math.random() * this.data.radius;
 
-//     // A small triangle shape in local space
-//     this.previewEl.setAttribute(
-//       'geometry',
-//       'primitive: triangle; vertexA: -0.05 -0.05 0; vertexB: 0.05 -0.05 0; vertexC: 0 0.06 0'
-//     );
+    const targetX = currentPos.x + Math.cos(angle) * dist;
+    const targetZ = currentPos.z + Math.sin(angle) * dist;
+    const targetY = this.data.minY + Math.random() * (this.data.maxY - this.data.minY);
 
-//     // Glowing, semi-transparent material
-//     this.previewEl.setAttribute(
-//       'material',
-//       'shader: standard; color: #00ffff; emissive: #00ffff; emissiveIntensity: 0.7; ' +
-//       'opacity: 0.4; transparent: true; metalness: 0; roughness: 1'
-//     );
+    const toStr = `${targetX} ${targetY} ${targetZ}`;
 
-//     // Gentle pulsing animation
-//     this.previewEl.setAttribute(
-//       'animation__pulse',
-//       'property: scale; dir: alternate; dur: 600; easing: easeInOutSine; loop: true; ' +
-//       'from: 0.85 0.85 0.85; to: 1.05 1.05 1.05'
-//     );
+    el.setAttribute('animation__move', {
+      property: 'position',
+      to: toStr,
+      dur: this.data.moveDuration,
+      easing: 'easeInOutSine'
+    });
 
-//     this.previewEl.setAttribute('visible', 'false');
+    // Optional: slow rotation spin for extra spook
+    el.setAttribute('animation__spin', {
+      property: 'rotation',
+      dur: this.data.moveDuration * 2,
+      easing: 'linear',
+      loop: true,
+      to: `0 ${Math.random() < 0.5 ? -360 : 360} 0`
+    });
+  },
 
-//     // Attach to scene (or world-root if you prefer)
-//     if (this.scene) {
-//       this.scene.appendChild(this.previewEl);
-//     }
-//   },
-
-//   tick(time, delta) {
-//     if (!this.scene || !this.scene.is('vr-mode')) {
-//       if (this.previewEl) this.previewEl.setAttribute('visible', 'false');
-//       return;
-//     }
-
-//     // Lazy-resolve hands
-//     if (!this.leftHandEl)  this.leftHandEl  = this.scene.querySelector('#leftHand');
-//     if (!this.rightHandEl) this.rightHandEl = this.scene.querySelector('#rightHand');
-//     if (!this.leftHandEl || !this.rightHandEl) return;
-
-//     const leftComp  = this.leftHandEl.components['hand-tracking-controls'];
-//     const rightComp = this.rightHandEl.components['hand-tracking-controls'];
-//     if (!leftComp || !rightComp || !leftComp.controller || !rightComp.controller) return;
-
-//     const leftJoints  = leftComp.controller.joints;
-//     const rightJoints = rightComp.controller.joints;
-//     if (!leftJoints || !rightJoints) return;
-
-//     const lThumb = leftJoints['thumb-tip'];
-//     const lIndex = leftJoints['index-finger-tip'];
-//     const rThumb = rightJoints['thumb-tip'];
-//     const rIndex = rightJoints['index-finger-tip'];
-
-//     if (!lThumb || !lIndex || !rThumb || !rIndex) {
-//       if (this.previewEl) this.previewEl.setAttribute('visible', 'false');
-//       return;
-//     }
-
-//     // Distances thumb–index for each hand = pinch check
-//     const pinchDistL = lThumb.position.distanceTo(lIndex.position);
-//     const pinchDistR = rThumb.position.distanceTo(rIndex.position);
-
-//     // Midpoints of each hand's pinch (world space)
-//     this.leftCenter
-//       .copy(lThumb.position)
-//       .add(lIndex.position)
-//       .multiplyScalar(0.5);
-
-//     this.rightCenter
-//       .copy(rThumb.position)
-//       .add(rIndex.position)
-//       .multiplyScalar(0.5);
-
-//     // Distance between hands
-//     const handsDist = this.leftCenter.distanceTo(this.rightCenter);
-
-//     const bothPinching =
-//       pinchDistL < this.data.pinchDistance &&
-//       pinchDistR < this.data.pinchDistance;
-
-//     const handsTriangleLike =
-//       handsDist > this.data.minHandsDistance &&
-//       handsDist < this.data.maxHandsDistance;
-
-//     if (bothPinching && handsTriangleLike) {
-//       this.holdSoFar += delta;
-
-//       // Triangle center = midpoint between both hand centers
-//       this.triangleCenter
-//         .copy(this.leftCenter)
-//         .add(this.rightCenter)
-//         .multiplyScalar(0.5);
-
-//       // --- Update preview position & orientation ---
-//       if (this.previewEl) {
-//         this.previewEl.setAttribute(
-//           'position',
-//           `${this.triangleCenter.x} ${this.triangleCenter.y} ${this.triangleCenter.z}`
-//         );
-
-//         // Face the camera
-//         const cameraEl = this.scene.camera && this.scene.camera.el;
-//         if (cameraEl && cameraEl.object3D && this.previewEl.object3D) {
-//           cameraEl.object3D.getWorldPosition(this.tempLook);
-//           this.previewEl.object3D.lookAt(this.tempLook);
-//         }
-
-//         this.previewEl.setAttribute('visible', 'true');
-//       }
-
-//       const enoughHold = this.holdSoFar >= this.data.holdMs;
-//       const cooledDown = (time - this.lastTriggerTime) >= this.data.cooldownMs;
-
-//       if (enoughHold && cooledDown) {
-//         this.lastTriggerTime = time;
-
-//         // Perform selection
-//         this.selectClosestClickable(this.triangleCenter);
-
-//         // Emit event for any extra hooks
-//         this.el.emit('triangle-select', {
-//           position: this.triangleCenter.clone()
-//         });
-//       }
-//     } else {
-//       // Reset when gesture breaks
-//       this.holdSoFar = 0;
-//       if (this.previewEl) this.previewEl.setAttribute('visible', 'false');
-//     }
-//   },
-
-//   selectClosestClickable(worldPoint) {
-//     if (!this.scene) return;
-
-//     const clickables = this.scene.querySelectorAll('.clickable');
-//     if (!clickables.length) return;
-
-//     let closestEl = null;
-//     let closestDist = Infinity;
-
-//     clickables.forEach(el => {
-//       if (!el.object3D) return;
-
-//       el.object3D.getWorldPosition(this.tempPos);
-//       const d = this.tempPos.distanceTo(worldPoint);
-
-//       if (d < closestDist) {
-//         closestDist = d;
-//         closestEl = el;
-//       }
-//     });
-
-//     if (closestEl && closestDist <= this.data.selectionRadius) {
-//       closestEl.emit(
-//         'click',
-//         {
-//           source: 'triangle-selector',
-//           position: worldPoint.clone()
-//         },
-//         false
-//       );
-//       console.log('Triangle-select clicked:', closestEl.id || closestEl);
-//     }
-//   }
-// });
-
+  onMoveComplete() {
+    // Little pause, then move again
+    setTimeout(() => this.scheduleNextMove(), this.data.pauseDuration);
+  }
+});
 
 
 /* ======================================================
@@ -694,18 +559,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             ghost.setAttribute('rotation', `0 ${rotY} 0`);
 
-            const riseTo = `${worldPos.x} ${worldPos.y + 2} ${worldPos.z}`;
-            ghost.setAttribute(
-              'animation__rise',
-              `property: position; to: ${riseTo}; dur: 3000; easing: linear`
-            );
+            // NEW: endless random floating
+            ghost.setAttribute('ghost-wander', 'radius: 2; minY: 0.5; maxY: 2.5; moveDuration: 4500');
 
-            (worldContainer || scene).appendChild(ghost);
-
-            setTimeout(() => {
-              if (ghost.parentElement) ghost.parentElement.removeChild(ghost);
-            }, 3000);
-          },
+            (worldContainer || scene).appendChild(ghost);},
           { once: true }
         );
       };
