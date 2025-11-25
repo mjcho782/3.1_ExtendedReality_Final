@@ -98,73 +98,216 @@ AFRAME.registerComponent('hover-highlight', {
   }
 });
 
-AFRAME.registerComponent('custom-gesture', {
+AFRAME.registerComponent('triangle-selector', {
   schema: {
-    hand: { type: 'string', default: 'right' } // just for logging
+    pinchDistance:      { type: 'number', default: 0.02 }, // meters thumb–index for pinch
+    minHandsDistance:   { type: 'number', default: 0.06 }, // min distance between hand centers
+    maxHandsDistance:   { type: 'number', default: 0.25 }, // max distance between hand centers
+    holdMs:             { type: 'number', default: 150 },  // how long both-hands-pinch must be held (ms)
+    cooldownMs:         { type: 'number', default: 800 },  // delay between triggers (ms)
+    selectionRadius:    { type: 'number', default: 0.35 }  // how far from the triangle center we search for objects
   },
 
   init() {
-    this.lastGesture = null;
-    this.tempVec = new THREE.Vector3();
+    this.scene = this.el.sceneEl;
+
+    this.leftHandEl = null;
+    this.rightHandEl = null;
+
+    this.holdSoFar = 0;
+    this.lastTriggerTime = -Infinity;
+
+    // Reusable vectors to avoid GC churn
+    this.leftCenter = new THREE.Vector3();
+    this.rightCenter = new THREE.Vector3();
+    this.triangleCenter = new THREE.Vector3();
+    this.tempPos = new THREE.Vector3();
   },
 
-  tick() {
-    // Only bother when in XR
-    const sceneEl = this.el.sceneEl;
-    if (!sceneEl || !sceneEl.is('vr-mode')) return;
+  tick(time, delta) {
+    // Only run when in XR mode
+    if (!this.scene || !this.scene.is('vr-mode')) return;
 
-    // Get the underlying hand-tracking controller
-    const comp = this.el.components['hand-tracking-controls'];
-    if (!comp || !comp.controller) return;
+    // Lazy-resolve hand entities
+    if (!this.leftHandEl)  this.leftHandEl  = this.scene.querySelector('#leftHand');
+    if (!this.rightHandEl) this.rightHandEl = this.scene.querySelector('#rightHand');
+    if (!this.leftHandEl || !this.rightHandEl) return;
 
-    const controller = comp.controller;
-    const joints = controller.joints;
-    if (!joints) return;
+    const leftComp  = this.leftHandEl.components['hand-tracking-controls'];
+    const rightComp = this.rightHandEl.components['hand-tracking-controls'];
+    if (!leftComp || !rightComp || !leftComp.controller || !rightComp.controller) return;
 
-    // Grab some key joints
-    const thumbTip = joints['thumb-tip'];
-    const indexTip = joints['index-finger-tip'];
-    const wrist    = joints['wrist'];
+    const leftJoints  = leftComp.controller.joints;
+    const rightJoints = rightComp.controller.joints;
+    if (!leftJoints || !rightJoints) return;
 
-    if (!thumbTip || !indexTip || !wrist) return;
+    const lThumb = leftJoints['thumb-tip'];
+    const lIndex = leftJoints['index-finger-tip'];
+    const rThumb = rightJoints['thumb-tip'];
+    const rIndex = rightJoints['index-finger-tip'];
 
-    // Positions (already in world space for WebXRController joints)
-    const thumbPos = thumbTip.position;
-    const indexPos = indexTip.position;
-    const wristPos = wrist.position;
+    if (!lThumb || !lIndex || !rThumb || !rIndex) return;
 
-    // Distances
-    const thumbIndexDist = thumbPos.distanceTo(indexPos);
-    const indexWristDist = indexPos.distanceTo(wristPos);
+    // Distances thumb–index for each hand = pinch check
+    const pinchDistL = lThumb.position.distanceTo(lIndex.position);
+    const pinchDistR = rThumb.position.distanceTo(rIndex.position);
 
-    // --- Very simple gesture classification ---
-    let gesture = 'open';
+    // Midpoints of each hand's pinch
+    this.leftCenter
+      .copy(lThumb.position)
+      .add(lIndex.position)
+      .multiplyScalar(0.5);
 
-    // Small distance between thumb & index → pinch
-    if (thumbIndexDist < 0.02) {
-      gesture = 'pinch';
-    }
-    // Not pinching + index far from wrist → "point"
-    else if (indexWristDist > 0.07) {
-      gesture = 'point';
-    }
+    this.rightCenter
+      .copy(rThumb.position)
+      .add(rIndex.position)
+      .multiplyScalar(0.5);
 
-    // If gesture changed, emit an event
-    if (gesture !== this.lastGesture) {
-      this.lastGesture = gesture;
-      console.log(this.data.hand, 'gesture:', gesture);
+    // Distance between hands
+    const handsDist = this.leftCenter.distanceTo(this.rightCenter);
 
-      this.el.emit('gesture-changed', { gesture });
+    const bothPinching =
+      pinchDistL < this.data.pinchDistance &&
+      pinchDistR < this.data.pinchDistance;
 
-      // Optional: emit more specific events you can listen to
-      if (gesture === 'point') {
-        this.el.emit('gesture-point');
-      } else if (gesture === 'pinch') {
-        this.el.emit('gesture-pinch');
+    const handsTriangleLike =
+      handsDist > this.data.minHandsDistance &&
+      handsDist < this.data.maxHandsDistance;
+
+    if (bothPinching && handsTriangleLike) {
+      this.holdSoFar += delta;
+
+      const enoughHold = this.holdSoFar >= this.data.holdMs;
+      const cooledDown = (time - this.lastTriggerTime) >= this.data.cooldownMs;
+
+      if (enoughHold && cooledDown) {
+        this.lastTriggerTime = time;
+
+        // Triangle center = midpoint between the two midpoints
+        this.triangleCenter
+          .copy(this.leftCenter)
+          .add(this.rightCenter)
+          .multiplyScalar(0.5);
+
+        // Fire selection
+        this.selectClosestClickable(this.triangleCenter);
+
+        // For debugging / future hooks
+        this.el.emit('triangle-select', {
+          position: this.triangleCenter.clone()
+        });
       }
+    } else {
+      // Reset hold time when gesture breaks
+      this.holdSoFar = 0;
+    }
+  },
+
+  selectClosestClickable(worldPoint) {
+    if (!this.scene) return;
+
+    const clickables = this.scene.querySelectorAll('.clickable');
+    if (!clickables.length) return;
+
+    let closestEl = null;
+    let closestDist = Infinity;
+
+    clickables.forEach(el => {
+      if (!el.object3D) return;
+
+      el.object3D.getWorldPosition(this.tempPos);
+      const d = this.tempPos.distanceTo(worldPoint);
+
+      if (d < closestDist) {
+        closestDist = d;
+        closestEl = el;
+      }
+    });
+
+    if (closestEl && closestDist <= this.data.selectionRadius) {
+      // Simulate a click on that entity
+      closestEl.emit(
+        'click',
+        {
+          source: 'triangle-selector',
+          position: worldPoint.clone()
+        },
+        false
+      );
+      // Optional: log for debugging
+      console.log('Triangle-select clicked:', closestEl.id || closestEl);
     }
   }
 });
+
+
+// AFRAME.registerComponent('custom-gesture', {
+//   schema: {
+//     hand: { type: 'string', default: 'right' } // just for logging
+//   },
+
+//   init() {
+//     this.lastGesture = null;
+//     this.tempVec = new THREE.Vector3();
+//   },
+
+//   tick() {
+//     // Only bother when in XR
+//     const sceneEl = this.el.sceneEl;
+//     if (!sceneEl || !sceneEl.is('vr-mode')) return;
+
+//     // Get the underlying hand-tracking controller
+//     const comp = this.el.components['hand-tracking-controls'];
+//     if (!comp || !comp.controller) return;
+
+//     const controller = comp.controller;
+//     const joints = controller.joints;
+//     if (!joints) return;
+
+//     // Grab some key joints
+//     const thumbTip = joints['thumb-tip'];
+//     const indexTip = joints['index-finger-tip'];
+//     const wrist    = joints['wrist'];
+
+//     if (!thumbTip || !indexTip || !wrist) return;
+
+//     // Positions (already in world space for WebXRController joints)
+//     const thumbPos = thumbTip.position;
+//     const indexPos = indexTip.position;
+//     const wristPos = wrist.position;
+
+//     // Distances
+//     const thumbIndexDist = thumbPos.distanceTo(indexPos);
+//     const indexWristDist = indexPos.distanceTo(wristPos);
+
+//     // --- Very simple gesture classification ---
+//     let gesture = 'open';
+
+//     // Small distance between thumb & index → pinch
+//     if (thumbIndexDist < 0.02) {
+//       gesture = 'pinch';
+//     }
+//     // Not pinching + index far from wrist → "point"
+//     else if (indexWristDist > 0.07) {
+//       gesture = 'point';
+//     }
+
+//     // If gesture changed, emit an event
+//     if (gesture !== this.lastGesture) {
+//       this.lastGesture = gesture;
+//       console.log(this.data.hand, 'gesture:', gesture);
+
+//       this.el.emit('gesture-changed', { gesture });
+
+//       // Optional: emit more specific events you can listen to
+//       if (gesture === 'point') {
+//         this.el.emit('gesture-point');
+//       } else if (gesture === 'pinch') {
+//         this.el.emit('gesture-pinch');
+//       }
+//     }
+//   }
+// });
 
 
 /* ======================================================

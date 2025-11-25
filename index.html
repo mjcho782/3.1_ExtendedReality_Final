@@ -43,7 +43,9 @@
       background="transparent"
       renderer="colorManagement: true; sortObjects: true; alpha: true"
       webxr="referenceSpaceType: local-floor; requiredFeatures: local-floor; optionalFeatures: hand-tracking, hit-test"
-      vr-mode-ui="enabled: true">
+      vr-mode-ui="enabled: true"
+      triangle-selector>
+
 
       <!-- Assets -->
       <a-assets>
@@ -96,15 +98,13 @@
     <a-entity
     id="leftHand"
     hand-tracking-controls="hand: left"
-    raycaster="objects: .clickable; showLine: true; recursive: true"
-    custom-gesture="hand: left">
+    raycaster="objects: .clickable; showLine: true; recursive: true">
     </a-entity>
 
     <a-entity
     id="rightHand"
     hand-tracking-controls="hand: right"
-    raycaster="objects: .clickable; showLine: true; recursive: true"
-    custom-gesture="hand: right">
+    raycaster="objects: .clickable; showLine: true; recursive: true">
     </a-entity>
 
 
