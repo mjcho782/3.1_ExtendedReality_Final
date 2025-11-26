@@ -100,24 +100,25 @@ AFRAME.registerComponent('hover-highlight', {
 
 AFRAME.registerComponent('ghost-wander', {
   schema: {
-    radius:        { type: 'number', default: 2.0 },
-    minY:          { type: 'number', default: 0.5 },
-    maxY:          { type: 'number', default: 2.5 },
-    moveDuration:  { type: 'number', default: 4500 },
-    pauseDuration: { type: 'number', default: 500 },
-    dragDuration:  { type: 'number', default: 2000 } // ms to pull ghost to player
+    radius:       { type: 'number', default: 2.0 },   // how far it can drift from current pos (in x/z)
+    minY:         { type: 'number', default: 0.5 },   // lower vertical bound
+    maxY:         { type: 'number', default: 2.5 },   // upper vertical bound
+    moveDuration: { type: 'number', default: 4500 },  // ms per move
+    pauseDuration:{ type: 'number', default: 500 }    // ms pause between moves
   },
 
   init() {
+    this.isDragging = false;
+
     this._onMoveComplete = this.onMoveComplete.bind(this);
-    this._onDragStart = this.onDragStart.bind(this);
     this._onDragComplete = this.onDragComplete.bind(this);
+    this._onDragStart = this.startDrag.bind(this);
+    this._onDragStop  = this.stopDrag.bind(this);
 
     this.el.addEventListener('animationcomplete__move', this._onMoveComplete);
-    this.el.addEventListener('ghost-drag-start', this._onDragStart);
     this.el.addEventListener('animationcomplete__drag', this._onDragComplete);
-
-    this.isDragging = false;
+    this.el.addEventListener('ghost-drag-start', this._onDragStart);
+    this.el.addEventListener('ghost-drag-stop', this._onDragStop);
 
     // Start wandering after first frame so initial position is set
     setTimeout(() => this.scheduleNextMove(), 50);
@@ -125,17 +126,20 @@ AFRAME.registerComponent('ghost-wander', {
 
   remove() {
     this.el.removeEventListener('animationcomplete__move', this._onMoveComplete);
-    this.el.removeEventListener('ghost-drag-start', this._onDragStart);
     this.el.removeEventListener('animationcomplete__drag', this._onDragComplete);
+    this.el.removeEventListener('ghost-drag-start', this._onDragStart);
+    this.el.removeEventListener('ghost-drag-stop', this._onDragStop);
   },
 
   scheduleNextMove() {
-    if (this.isDragging) return; // don't wander while dragging
+    // If currently being dragged, don't schedule wandering
+    if (this.isDragging) return;
 
     const el = this.el;
     const obj = el.object3D;
     const currentPos = obj.position;
 
+    // If room bounds not ready, fallback to radius
     const roomBox = window.__ROOM_BOUNDING_BOX__;
     if (!roomBox) {
       console.warn("Room bounds not ready, ghost using radius wandering.");
@@ -169,6 +173,8 @@ AFRAME.registerComponent('ghost-wander', {
   },
 
   wanderByRadius(currentPos) {
+    if (this.isDragging) return;
+
     const angle = Math.random() * Math.PI * 2;
     const dist = Math.random() * this.data.radius;
 
@@ -187,12 +193,13 @@ AFRAME.registerComponent('ghost-wander', {
   },
 
   onMoveComplete() {
+    // If dragging now, don't schedule wandering
     if (this.isDragging) return;
+    // Little pause, then move again
     setTimeout(() => this.scheduleNextMove(), this.data.pauseDuration);
   },
 
-  // Called when selection component emits 'ghost-drag-start'
-  onDragStart() {
+  startDrag() {
     if (this.isDragging) return;
     this.isDragging = true;
 
@@ -200,36 +207,45 @@ AFRAME.registerComponent('ghost-wander', {
     this.el.removeAttribute('animation__move');
     this.el.removeAttribute('animation__spin');
 
+    // Drag toward the player's camera
     const scene = this.el.sceneEl;
-    if (!scene) return;
+    const cameraEl = scene && (scene.camera && scene.camera.el);
+    if (!cameraEl || !cameraEl.object3D) return;
 
-    const cameraEl = scene.camera && scene.camera.el;
-    const ghostObj = this.el.object3D;
-
-    const ghostPos = new THREE.Vector3();
-    ghostObj.getWorldPosition(ghostPos);
-
-    let camPos = new THREE.Vector3(0, 1.6, 0);
-    if (cameraEl && cameraEl.object3D) {
-      cameraEl.object3D.getWorldPosition(camPos);
-    }
-
-    // Pull ghost toward just in front of the camera
-    const dirToCam = new THREE.Vector3().subVectors(camPos, ghostPos).normalize();
-    const finalPos = camPos.clone().addScaledVector(dirToCam, -0.4); // ~40cm in front of face
+    const camObj = cameraEl.object3D;
+    const target = new THREE.Vector3(0, 0, -0.4); // ~40cm in front of camera
+    camObj.localToWorld(target);
 
     this.el.setAttribute('animation__drag', {
       property: 'position',
-      to: `${finalPos.x} ${finalPos.y} ${finalPos.z}`,
-      dur: this.data.dragDuration,
-      easing: 'easeInOutCubic'
+      to: `${target.x} ${target.y} ${target.z}`,
+      dur: 1000,
+      easing: 'easeInOutQuad'
     });
   },
 
-  // When drag finishes, make ghost disappear
+  stopDrag() {
+    // Called when pinch is released
+    if (!this.isDragging) return;
+
+    this.isDragging = false;
+    // Stop drag animation
+    this.el.removeAttribute('animation__drag');
+
+    // Resume wandering from current position
+    this.scheduleNextMove();
+  },
+
   onDragComplete() {
-    const parent = this.el.parentElement;
-    if (parent) parent.removeChild(this.el);
+    // If drag completed while still dragging, "ghost reached the player" → disappear
+    if (!this.isDragging) return;
+
+    this.isDragging = false;
+
+    // Remove ghost from scene
+    if (this.el.parentNode) {
+      this.el.parentNode.removeChild(this.el);
+    }
   }
 });
 
@@ -629,10 +645,10 @@ document.addEventListener('DOMContentLoaded', () => {
               `${GHOST_SCALE} ${GHOST_SCALE} ${GHOST_SCALE}`
             );
 
-            // Make ghost selectable like other objects
-            ghost.classList.add('clickable');
+            // Mark as ghost + make it selectable
+            ghost.setAttribute('data-is-ghost', 'true');
+            ghost.classList.add('selectable', 'clickable');
             ghost.setAttribute('hover-highlight', '');
-
 
             let rotY = 0;
             const cameraEl = scene.camera && scene.camera.el;
@@ -647,7 +663,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             ghost.setAttribute('rotation', `0 ${rotY} 0`);
 
-            // NEW: endless random floating
+            // Endless random floating (within room bounds)
             ghost.setAttribute('ghost-wander', 'radius: 2; minY: 0.5; maxY: 2.5; moveDuration: 4500');
 
             (worldContainer || scene).appendChild(ghost);},
@@ -676,10 +692,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ===============================
-// Two-hand select with center glow
-// ===============================
-// ===============================
-// Two-hand select with center glow + ghost drag
+// Two-hand select with center glow + ghost dragging
 // ===============================
 AFRAME.registerComponent('two-hand-select-circle', {
   init() {
@@ -687,33 +700,34 @@ AFRAME.registerComponent('two-hand-select-circle', {
     this.scene = scene;
 
     // Find hands & camera
-    this.leftHand  = scene.querySelector('#leftHand');
+    this.leftHand = scene.querySelector('#leftHand');
     this.rightHand = scene.querySelector('#rightHand');
-    this.camera    = scene.querySelector('a-camera');
+    this.camera = scene.querySelector('a-camera');
 
-    this.leftPinching  = false;
+    this.leftPinching = false;
     this.rightPinching = false;
+    this.wasActive = false;
 
-    this.wasActive        = false;
-    this.isHoldingGhost   = false;
-    this.dragStarted      = false;
-    this.heldGhostEl      = null;
-    this.baseScale        = 1.0;
-    this.currentScale     = 1.0;
-    this.growthRate       = 0.0004; // scale per ms (~0.4 per second)
-    this.dragThreshold    = 1.2;    // 20% bigger
+    // Ghost hold state
+    this.currentTarget = null;
+    this.isHoldingGhost = false;
+    this.holdTimeMs = 0;
+    this.hasTriggeredDrag = false;
 
-    // --- Create the glowing circle preview (outline only) ---
+    // --- Create the glowing circle preview, attached to the camera ---
     this.preview = document.createElement('a-entity');
-    this.preview.setAttribute(
-      'geometry',
-      'primitive: ring; radiusInner: 0.11; radiusOuter: 0.13; segmentsTheta: 64'
-    );
+    this.preview.setAttribute('geometry', 'primitive: circle; radius: 0.12');
     this.preview.setAttribute(
       'material',
-      'color: #00ffff; shader: flat; opacity: 0.5; side: double; transparent: true'
+      'color: #00ffff; shader: flat; opacity: 0.35; side: double; transparent: true'
     );
     this.preview.setAttribute('visible', 'false');
+
+    // Gentle pulse; we will also scale it manually for ghost hold progress
+    this.preview.setAttribute(
+      'animation__pulse',
+      'property: opacity; dir: alternate; dur: 500; loop: true; from: 0.25; to: 0.6'
+    );
 
     if (this.camera) {
       this.camera.appendChild(this.preview);
@@ -733,6 +747,8 @@ AFRAME.registerComponent('two-hand-select-circle', {
       handEl.addEventListener('pinchended', () => {
         if (side === 'left') this.leftPinching = false;
         else this.rightPinching = false;
+        // When either hand stops pinching, treat as gesture end
+        this.onGestureEnd();
       });
     };
 
@@ -740,8 +756,96 @@ AFRAME.registerComponent('two-hand-select-circle', {
     addPinchListeners(this.rightHand, 'right');
   },
 
+  tick(time, timeDelta) {
+    const scene = this.scene;
+    if (!scene) return;
+
+    // Only do this in XR mode
+    if (!scene.is('vr-mode')) {
+      if (this.preview) this.preview.setAttribute('visible', 'false');
+      this.wasActive = false;
+      return;
+    }
+
+    const active = this.leftPinching && this.rightPinching;
+
+    if (!active) {
+      if (this.preview) this.preview.setAttribute('visible', 'false');
+      this.wasActive = false;
+      return;
+    }
+
+    if (this.preview) {
+      this.preview.setAttribute('visible', 'true');
+    }
+
+    // Get what we're pointing at
+    const target = this.getRaycastTarget();
+    const isGhost =
+      target &&
+      (target.getAttribute('data-is-ghost') === 'true' ||
+       target.getAttribute('gltf-model') === '#ghost');
+
+    // If target changed, reset ghost hold state and stop any ongoing drag
+    if (target !== this.currentTarget) {
+      if (this.currentTarget && this.isHoldingGhost) {
+        this.currentTarget.emit('ghost-drag-stop');
+      }
+      this.currentTarget = target;
+      this.isHoldingGhost = !!isGhost;
+      this.holdTimeMs = 0;
+      this.hasTriggeredDrag = false;
+
+      if (this.preview) {
+        this.preview.setAttribute('scale', '1 1 1');
+      }
+    }
+
+    if (isGhost) {
+      // Holding ghost: accumulate hold time
+      this.isHoldingGhost = true;
+      this.holdTimeMs += (timeDelta || 0);
+
+      const progress = Math.min(this.holdTimeMs / 1000, 1); // 1s to full
+      const s = 1 + 0.2 * progress; // up to +20% scale
+      if (this.preview) {
+        this.preview.setAttribute('scale', `${s} ${s} ${s}`);
+      }
+
+      // After 1s, trigger drag once
+      if (!this.hasTriggeredDrag && this.holdTimeMs >= 1000 && this.currentTarget) {
+        this.hasTriggeredDrag = true;
+        this.currentTarget.emit('ghost-drag-start');
+      }
+    } else {
+      // Non-ghost: behave like before (click once per activation)
+      if (active && !this.wasActive && target) {
+        target.emit('click');
+      }
+    }
+
+    this.wasActive = true;
+  },
+
+  onGestureEnd() {
+    // Called when either hand stops pinching
+    if (this.currentTarget && this.isHoldingGhost) {
+      this.currentTarget.emit('ghost-drag-stop');
+    }
+    this.isHoldingGhost = false;
+    this.holdTimeMs = 0;
+    this.hasTriggeredDrag = false;
+    if (this.preview) {
+      this.preview.setAttribute('scale', '1 1 1');
+      this.preview.setAttribute('visible', 'false');
+    }
+    this.currentTarget = null;
+    this.wasActive = false;
+  },
+
   getRaycastTarget() {
     if (!this.camera) return null;
+
     const cursor = this.camera.querySelector('[raycaster]');
     const rc = cursor && cursor.components && cursor.components.raycaster;
     if (!rc) return null;
@@ -750,94 +854,16 @@ AFRAME.registerComponent('two-hand-select-circle', {
     if (!intersections.length) return null;
 
     const hit = intersections[0];
-    if (hit.object && hit.object.el) return hit.object.el;
-    if (hit.el) return hit.el;
-    if (hit.object && hit.object.parent && hit.object.parent.el) return hit.object.parent.el;
-    return null;
-  },
+    let target = null;
 
-  isGhost(target) {
-    if (!target) return false;
-    const modelAttr = target.getAttribute('gltf-model');
-    return modelAttr === '#ghost';
-  },
-
-  tick(time, delta) {
-    const scene = this.scene;
-    if (!scene) return;
-
-    // Only in XR
-    if (!scene.is('vr-mode')) {
-      if (this.preview) this.preview.setAttribute('visible', 'false');
-      this.wasActive      = false;
-      this.isHoldingGhost = false;
-      this.dragStarted    = false;
-      this.heldGhostEl    = null;
-      this.currentScale   = this.baseScale;
-      if (this.preview && this.preview.object3D) {
-        this.preview.object3D.scale.set(this.baseScale, this.baseScale, this.baseScale);
-      }
-      return;
+    if (hit.object && hit.object.el) {
+      target = hit.object.el;
+    } else if (hit.el) {
+      target = hit.el;
+    } else if (hit.object && hit.object.parent && hit.object.parent.el) {
+      target = hit.object.parent.el;
     }
 
-    const active = this.leftPinching && this.rightPinching;
-
-    // On pinch start: decide what we're selecting
-    if (active && !this.wasActive) {
-      const target = this.getRaycastTarget();
-      if (this.isGhost(target)) {
-        // Start ghost hold mode
-        this.isHoldingGhost = true;
-        this.dragStarted    = false;
-        this.heldGhostEl    = target;
-        this.currentScale   = this.baseScale;
-        if (this.preview && this.preview.object3D) {
-          this.preview.object3D.scale.set(this.baseScale, this.baseScale, this.baseScale);
-        }
-        if (this.preview) this.preview.setAttribute('visible', 'true');
-      } else {
-        // Normal object: just fire click once, like before
-        this.isHoldingGhost = false;
-        this.dragStarted    = false;
-        this.heldGhostEl    = null;
-        if (this.preview) this.preview.setAttribute('visible', 'false');
-        if (target) {
-          target.emit('click');
-        }
-      }
-    }
-
-    // While pinch is held
-    if (active) {
-      if (this.isHoldingGhost && this.preview && this.preview.object3D) {
-        // Circle keeps growing while holding ghost
-        const dt = (delta || 16);
-        this.currentScale += this.growthRate * dt;
-        this.preview.object3D.scale.set(this.currentScale, this.currentScale, this.currentScale);
-
-        // When circle 20% bigger, start dragging ghost toward player
-        if (!this.dragStarted && this.currentScale >= this.dragThreshold) {
-          this.dragStarted = true;
-          if (this.heldGhostEl) {
-            this.heldGhostEl.emit('ghost-drag-start');
-          }
-        }
-
-        // Keep it visible during hold
-        this.preview.setAttribute('visible', 'true');
-      }
-    } else {
-      // Pinch released → reset preview & ghost-hold state
-      if (this.preview && this.preview.object3D) {
-        this.preview.object3D.scale.set(this.baseScale, this.baseScale, this.baseScale);
-      }
-      if (this.preview) this.preview.setAttribute('visible', 'false');
-      this.isHoldingGhost = false;
-      this.dragStarted    = false;
-      this.heldGhostEl    = null;
-    }
-
-    this.wasActive = active;
+    return target || null;
   }
 });
-
