@@ -214,14 +214,14 @@ AFRAME.registerComponent('ghost-wander', {
     const camObj = cameraEl.object3D;
   
     // SUPER CLOSE: ~10cm from the camera
-    const target = new THREE.Vector3(0, 0, -0.10);
+    const target = new THREE.Vector3(0, 0, -0.05);
     camObj.localToWorld(target);
   
     // MUCH SLOWER: 3.5 seconds to reach the user
     this.el.setAttribute('animation__drag', {
       property: 'position',
       to: `${target.x} ${target.y} ${target.z}`,
-      dur: 3500,                 // SLOW approach (3.5 sec)
+      dur: 4000,                 // SLOW approach (3.5 sec)
       easing: 'easeInOutQuad'
     });
   }, 
