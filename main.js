@@ -120,6 +120,10 @@ AFRAME.registerComponent('ghost-wander', {
     this.el.addEventListener('ghost-drag-start', this._onDragStart);
     this.el.addEventListener('ghost-drag-stop', this._onDragStop);
 
+    // Reusable vectors for distance checks
+    this._ghostPos = new THREE.Vector3();
+    this._camPos   = new THREE.Vector3();
+
     // Start wandering after first frame so initial position is set
     setTimeout(() => this.scheduleNextMove(), 50);
   },
@@ -202,29 +206,29 @@ AFRAME.registerComponent('ghost-wander', {
   startDrag() {
     if (this.isDragging) return;
     this.isDragging = true;
-  
+
     // Stop wandering animations
     this.el.removeAttribute('animation__move');
     this.el.removeAttribute('animation__spin');
-  
+
     const scene = this.el.sceneEl;
     const cameraEl = scene && (scene.camera && scene.camera.el);
     if (!cameraEl || !cameraEl.object3D) return;
-  
+
     const camObj = cameraEl.object3D;
-  
-    // SUPER CLOSE: ~10cm from the camera
-    const target = new THREE.Vector3(0, 0, -0.02);
+
+    // Target: very close in front of the camera
+    const target = new THREE.Vector3(0, 0, -0.1); // 10cm in front
     camObj.localToWorld(target);
-  
-    // MUCH SLOWER: 3.5 seconds to reach the user
+
+    // Slower drag: 3.5–4s feels dramatic
     this.el.setAttribute('animation__drag', {
       property: 'position',
       to: `${target.x} ${target.y} ${target.z}`,
-      dur: 4000,                 // SLOW approach (3.5 sec)
+      dur: 3500,
       easing: 'easeInOutQuad'
     });
-  }, 
+  },
 
   stopDrag() {
     // Called when pinch is released
@@ -244,9 +248,34 @@ AFRAME.registerComponent('ghost-wander', {
 
     this.isDragging = false;
 
-    // Remove ghost from scene
     if (this.el.parentNode) {
       this.el.parentNode.removeChild(this.el);
+    }
+  },
+
+  // EXTRA SAFETY: if the ghost gets very close to the camera while dragging,
+  // remove it even if the animation event doesn't fire.
+  tick() {
+    if (!this.isDragging) return;
+
+    const scene = this.el.sceneEl;
+    if (!scene) return;
+
+    const cameraEl = scene.camera && scene.camera.el;
+    if (!cameraEl || !cameraEl.object3D) return;
+
+    // Get world positions
+    this.el.object3D.getWorldPosition(this._ghostPos);
+    cameraEl.object3D.getWorldPosition(this._camPos);
+
+    const dist = this._ghostPos.distanceTo(this._camPos);
+
+    // If ghost is within 20cm of the camera, treat as "reached player"
+    if (dist < 0.2) {
+      this.isDragging = false;
+      if (this.el.parentNode) {
+        this.el.parentNode.removeChild(this.el);
+      }
     }
   }
 });
