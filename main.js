@@ -214,7 +214,7 @@ AFRAME.registerComponent('ghost-wander', {
     const camObj = cameraEl.object3D;
   
     // SUPER CLOSE: ~10cm from the camera
-    const target = new THREE.Vector3(0, 0, -0.05);
+    const target = new THREE.Vector3(0, 0, -0.02);
     camObj.localToWorld(target);
   
     // MUCH SLOWER: 3.5 seconds to reach the user
