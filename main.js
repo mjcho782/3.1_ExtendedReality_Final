@@ -203,30 +203,28 @@ AFRAME.registerComponent('ghost-wander', {
     if (this.isDragging) return;
     this.isDragging = true;
   
-    // Stop wandering animations while dragging
+    // Stop wandering animations
     this.el.removeAttribute('animation__move');
     this.el.removeAttribute('animation__spin');
   
-    // Drag toward the player's camera
     const scene = this.el.sceneEl;
     const cameraEl = scene && (scene.camera && scene.camera.el);
     if (!cameraEl || !cameraEl.object3D) return;
   
     const camObj = cameraEl.object3D;
   
-    // Aim to a point VERY close in front of the camera (~20cm)
-    const target = new THREE.Vector3(0, 0, -0.2);
+    // SUPER CLOSE: ~10cm from the camera
+    const target = new THREE.Vector3(0, 0, -0.10);
     camObj.localToWorld(target);
   
-    // Slower approach: take 2 seconds instead of 1
+    // MUCH SLOWER: 3.5 seconds to reach the user
     this.el.setAttribute('animation__drag', {
       property: 'position',
       to: `${target.x} ${target.y} ${target.z}`,
-      dur: 2000,                // was 1000
+      dur: 3500,                 // SLOW approach (3.5 sec)
       easing: 'easeInOutQuad'
     });
-  },
-    
+  }, 
 
   stopDrag() {
     // Called when pinch is released
