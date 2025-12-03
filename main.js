@@ -218,14 +218,14 @@ AFRAME.registerComponent('ghost-wander', {
     const camObj = cameraEl.object3D;
 
     // Target: very close in front of the camera
-    const target = new THREE.Vector3(0, 0, -0.2); // 20cm in front
+    const target = new THREE.Vector3(0, 0, -0.25); // 25cm in front
     camObj.localToWorld(target);
 
     // Slower drag: 3.5–4s feels dramatic
     this.el.setAttribute('animation__drag', {
       property: 'position',
       to: `${target.x} ${target.y} ${target.z}`,
-      dur: 3500,
+      dur: 4000,
       easing: 'easeInOutQuad'
     });
   },
@@ -560,6 +560,8 @@ document.addEventListener('DOMContentLoaded', () => {
           const isWall = groupName === 'wall' || groupName.includes('wall') || groupName === 'wall exterior';
           const isDoor = groupName === 'door' || groupName.includes('door') || groupName === 'door';
           const isTable = groupName === 'table' || groupName.includes('table') || groupName === 'table';
+          const isShelf = groupName === 'shelf' || groupName.includes('shelf') || groupName === 'shelf';
+          const isCabinet = groupName === 'cabinet' || groupName.includes('cabinet') || groupName === 'cabinet';
 
           const partEl = document.createElement('a-entity');
 
@@ -617,7 +619,7 @@ document.addEventListener('DOMContentLoaded', () => {
           
           partEl.setObject3D('mesh', meshGroup);
 
-          if (!isWall && !isDoor && !isTable) {
+          if (!isWall && !isDoor && !isTable && !isShelf && !isCabinet) {
             // These are the interactive parts
             partEl.classList.add('selectable', 'clickable');
             partEl.setAttribute('hover-highlight', '');
