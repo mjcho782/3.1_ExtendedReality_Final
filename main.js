@@ -725,27 +725,30 @@ document.addEventListener('DOMContentLoaded', () => {
 // ===============================
 // Two-hand select with center glow + ghost dragging
 // ===============================
+// ===============================
+// Two-hand select with center glow + latched ghost dragging
+// ===============================
 AFRAME.registerComponent('two-hand-select-circle', {
   init() {
     const scene = this.el.sceneEl;
     this.scene = scene;
 
     // Find hands & camera
-    this.leftHand = scene.querySelector('#leftHand');
+    this.leftHand  = scene.querySelector('#leftHand');
     this.rightHand = scene.querySelector('#rightHand');
-    this.camera = scene.querySelector('a-camera');
+    this.camera    = scene.querySelector('a-camera');
 
-    this.leftPinching = false;
+    this.leftPinching  = false;
     this.rightPinching = false;
-    this.wasActive = false;
+    this.wasActive     = false;
 
     // Ghost hold state
-    this.currentTarget = null;
-    this.isHoldingGhost = false;
-    this.holdTimeMs = 0;
+    this.currentTarget   = null;
+    this.isHoldingGhost  = false;
+    this.holdTimeMs      = 0;
     this.hasTriggeredDrag = false;
 
-    // --- Create the glowing circle preview, attached to the camera ---
+    // --- Glowing circle preview (in the center of view) ---
     this.preview = document.createElement('a-entity');
     this.preview.setAttribute('geometry', 'primitive: circle; radius: 0.12');
     this.preview.setAttribute(
@@ -753,8 +756,6 @@ AFRAME.registerComponent('two-hand-select-circle', {
       'color: #00ffff; shader: flat; opacity: 0.35; side: double; transparent: true'
     );
     this.preview.setAttribute('visible', 'false');
-
-    // Gentle pulse; we will also scale it manually for ghost hold progress
     this.preview.setAttribute(
       'animation__pulse',
       'property: opacity; dir: alternate; dur: 500; loop: true; from: 0.25; to: 0.6'
@@ -778,8 +779,7 @@ AFRAME.registerComponent('two-hand-select-circle', {
       handEl.addEventListener('pinchended', () => {
         if (side === 'left') this.leftPinching = false;
         else this.rightPinching = false;
-        // When either hand stops pinching, treat as gesture end
-        this.onGestureEnd();
+        this.onGestureEnd(); // pinch ended on either hand
       });
     };
 
@@ -787,93 +787,7 @@ AFRAME.registerComponent('two-hand-select-circle', {
     addPinchListeners(this.rightHand, 'right');
   },
 
-  tick(time, timeDelta) {
-    const scene = this.scene;
-    if (!scene) return;
-
-    // Only do this in XR mode
-    if (!scene.is('vr-mode')) {
-      if (this.preview) this.preview.setAttribute('visible', 'false');
-      this.wasActive = false;
-      return;
-    }
-
-    const active = this.leftPinching && this.rightPinching;
-
-    if (!active) {
-      if (this.preview) this.preview.setAttribute('visible', 'false');
-      this.wasActive = false;
-      return;
-    }
-
-    if (this.preview) {
-      this.preview.setAttribute('visible', 'true');
-    }
-
-    // Get what we're pointing at
-    const target = this.getRaycastTarget();
-    const isGhost =
-      target &&
-      (target.getAttribute('data-is-ghost') === 'true' ||
-       target.getAttribute('gltf-model') === '#ghost');
-
-    // If target changed, reset ghost hold state and stop any ongoing drag
-    if (target !== this.currentTarget) {
-      if (this.currentTarget && this.isHoldingGhost) {
-        this.currentTarget.emit('ghost-drag-stop');
-      }
-      this.currentTarget = target;
-      this.isHoldingGhost = !!isGhost;
-      this.holdTimeMs = 0;
-      this.hasTriggeredDrag = false;
-
-      if (this.preview) {
-        this.preview.setAttribute('scale', '1 1 1');
-      }
-    }
-
-    if (isGhost) {
-      // Holding ghost: accumulate hold time
-      this.isHoldingGhost = true;
-      this.holdTimeMs += (timeDelta || 0);
-
-      const progress = Math.min(this.holdTimeMs / 1000, 1); // 1s to full
-      const s = 1 + 0.2 * progress; // up to +20% scale
-      if (this.preview) {
-        this.preview.setAttribute('scale', `${s} ${s} ${s}`);
-      }
-
-      // After 1s, trigger drag once
-      if (!this.hasTriggeredDrag && this.holdTimeMs >= 1000 && this.currentTarget) {
-        this.hasTriggeredDrag = true;
-        this.currentTarget.emit('ghost-drag-start');
-      }
-    } else {
-      // Non-ghost: behave like before (click once per activation)
-      if (active && !this.wasActive && target) {
-        target.emit('click');
-      }
-    }
-
-    this.wasActive = true;
-  },
-
-  onGestureEnd() {
-    // Called when either hand stops pinching
-    if (this.currentTarget && this.isHoldingGhost) {
-      this.currentTarget.emit('ghost-drag-stop');
-    }
-    this.isHoldingGhost = false;
-    this.holdTimeMs = 0;
-    this.hasTriggeredDrag = false;
-    if (this.preview) {
-      this.preview.setAttribute('scale', '1 1 1');
-      this.preview.setAttribute('visible', 'false');
-    }
-    this.currentTarget = null;
-    this.wasActive = false;
-  },
-
+  // Helper: which entity is under the center ray?
   getRaycastTarget() {
     if (!this.camera) return null;
 
@@ -896,5 +810,115 @@ AFRAME.registerComponent('two-hand-select-circle', {
     }
 
     return target || null;
+  },
+
+  isGhost(target) {
+    if (!target) return false;
+    return (
+      target.getAttribute('data-is-ghost') === 'true' ||
+      target.getAttribute('gltf-model') === '#ghost'
+    );
+  },
+
+  tick(time, timeDelta) {
+    const scene = this.scene;
+    if (!scene) return;
+
+    // Only in XR mode
+    if (!scene.is('vr-mode')) {
+      if (this.preview) this.preview.setAttribute('visible', 'false');
+      this.wasActive = false;
+      return;
+    }
+
+    const active = this.leftPinching && this.rightPinching;
+
+    // If not pinching on this frame, do nothing here (onGestureEnd handles cleanup)
+    if (!active) {
+      if (this.preview) this.preview.setAttribute('visible', 'false');
+      this.wasActive = false;
+      return;
+    }
+
+    // Pinch just started this frame
+    if (active && !this.wasActive) {
+      const target = this.getRaycastTarget();
+
+      if (this.isGhost(target)) {
+        // Latch onto this ghost until pinch ends
+        this.currentTarget    = target;
+        this.isHoldingGhost   = true;
+        this.holdTimeMs       = 0;
+        this.hasTriggeredDrag = false;
+
+        if (this.preview) {
+          this.preview.setAttribute('visible', 'true');
+          this.preview.setAttribute('scale', '1 1 1');
+        }
+      } else if (target) {
+        // Normal clickable: behave like a one-shot click
+        this.currentTarget    = null;
+        this.isHoldingGhost   = false;
+        this.holdTimeMs       = 0;
+        this.hasTriggeredDrag = false;
+
+        if (this.preview) {
+          this.preview.setAttribute('visible', 'false');
+        }
+
+        target.emit('click');
+      } else {
+        // Nothing under cursor
+        this.currentTarget    = null;
+        this.isHoldingGhost   = false;
+        this.holdTimeMs       = 0;
+        this.hasTriggeredDrag = false;
+
+        if (this.preview) {
+          this.preview.setAttribute('visible', 'false');
+        }
+      }
+    }
+
+    // While pinch is held and we've latched onto a ghost
+    if (this.isHoldingGhost && this.currentTarget) {
+      const dt = timeDelta || 0;
+      this.holdTimeMs += dt;
+
+      const progress = Math.min(this.holdTimeMs / 1000, 1); // 1s to full
+      const s = 1 + 0.2 * progress; // up to +20% scale
+
+      if (this.preview) {
+        this.preview.setAttribute('visible', 'true');
+        this.preview.setAttribute('scale', `${s} ${s} ${s}`);
+      }
+
+      // After 1 second of continuous pinch, start dragging
+      if (!this.hasTriggeredDrag && this.holdTimeMs >= 1000) {
+        this.hasTriggeredDrag = true;
+        this.currentTarget.emit('ghost-drag-start');
+      }
+    }
+
+    this.wasActive = true;
+  },
+
+  onGestureEnd() {
+    // Called when either hand stops pinching
+    if (this.isHoldingGhost && this.currentTarget) {
+      this.currentTarget.emit('ghost-drag-stop');
+    }
+
+    this.currentTarget    = null;
+    this.isHoldingGhost   = false;
+    this.holdTimeMs       = 0;
+    this.hasTriggeredDrag = false;
+
+    if (this.preview) {
+      this.preview.setAttribute('scale', '1 1 1');
+      this.preview.setAttribute('visible', 'false');
+    }
+
+    this.wasActive = false;
   }
 });
