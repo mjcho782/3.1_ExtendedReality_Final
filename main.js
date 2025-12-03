@@ -648,62 +648,86 @@ document.addEventListener('DOMContentLoaded', () => {
           return;
         }
 
-        // Pick one random part as the "fake" object that spawns the ghost
-        const fakeIdx = Math.floor(Math.random() * createdParts.length);
-        const fakeEl = createdParts[fakeIdx];
-        if (!fakeEl) return;
+                // Pick up to 3 random parts as "fake" objects that spawn ghosts
+        const ghostModelIds = ['#ghost1', '#ghost2', '#ghost3'];
+        if (!createdParts.length) {
+          console.warn('[GLB Split] No non-wall parts created.');
+          return;
+        }
 
-        fakeEl.setAttribute('data-fake', 'true');
-        fakeEl.addEventListener(
-          'click',
-          e => {
-            if (e && e.stopPropagation) e.stopPropagation();
-            if (fakeEl.getAttribute('data-fake-handled') === 'true') return;
-            fakeEl.setAttribute('data-fake-handled', 'true');
+        const shuffledParts = createdParts.slice().sort(() => Math.random() - 0.5);
+        const numGhosts = Math.min(ghostModelIds.length, shuffledParts.length);
 
-            const worldPos = new THREE.Vector3();
-            const worldQuat = new THREE.Quaternion();
-            const worldScale = new THREE.Vector3();
-            fakeEl.object3D.updateWorldMatrix(true, false);
-            fakeEl.object3D.matrixWorld.decompose(worldPos, worldQuat, worldScale);
+        for (let i = 0; i < numGhosts; i++) {
+          const fakeEl = shuffledParts[i];
+          const modelId = ghostModelIds[i];
 
-            fakeEl.setAttribute('visible', 'false');
+          if (!fakeEl) continue;
 
-            const ghost = document.createElement('a-entity');
-            ghost.setAttribute('gltf-model', '#ghost');
-            ghost.setAttribute(
-              'position',
-              `${worldPos.x} ${worldPos.y} ${worldPos.z}`
-            );
-            ghost.setAttribute(
-              'scale',
-              `${GHOST_SCALE} ${GHOST_SCALE} ${GHOST_SCALE}`
-            );
+          fakeEl.setAttribute('data-fake', 'true');
+          fakeEl.setAttribute('data-ghost-model', modelId);
 
-            // Mark as ghost + make it selectable
-            ghost.setAttribute('data-is-ghost', 'true');
-            ghost.classList.add('selectable', 'clickable');
-            ghost.setAttribute('hover-highlight', '');
+          fakeEl.addEventListener(
+            'click',
+            e => {
+              if (e && e.stopPropagation) e.stopPropagation();
+              if (fakeEl.getAttribute('data-fake-handled') === 'true') return;
+              fakeEl.setAttribute('data-fake-handled', 'true');
 
-            let rotY = 0;
-            const cameraEl = scene.camera && scene.camera.el;
-            if (cameraEl && cameraEl.object3D) {
-              const camPos = new THREE.Vector3();
-              cameraEl.object3D.getWorldPosition(camPos);
-              const dirToCamera = new THREE.Vector3().subVectors(camPos, worldPos);
-              rotY = THREE.MathUtils.radToDeg(Math.atan2(dirToCamera.x, dirToCamera.z));
-            } else {
-              const eulerFallback = new THREE.Euler().setFromQuaternion(worldQuat, 'YXZ');
-              rotY = THREE.MathUtils.radToDeg(eulerFallback.y);
-            }
-            ghost.setAttribute('rotation', `0 ${rotY} 0`);
+              // Get world transform of the clicked part
+              const worldPos = new THREE.Vector3();
+              const worldQuat = new THREE.Quaternion();
+              const worldScale = new THREE.Vector3();
+              fakeEl.object3D.updateWorldMatrix(true, false);
+              fakeEl.object3D.matrixWorld.decompose(worldPos, worldQuat, worldScale);
 
-            // Endless random floating (within room bounds)
-            ghost.setAttribute('ghost-wander', 'radius: 2; minY: 0.5; maxY: 2.5; moveDuration: 4500');
+              // Hide the original part
+              fakeEl.setAttribute('visible', 'false');
 
-            (worldContainer || scene).appendChild(ghost);},
-          { once: true }
-        );
+              // Spawn that part's assigned ghost model
+              const ghost = document.createElement('a-entity');
+              const ghostModel = fakeEl.getAttribute('data-ghost-model') || modelId;
+              ghost.setAttribute('gltf-model', ghostModel);
+              ghost.setAttribute(
+                'position',
+                `${worldPos.x} ${worldPos.y} ${worldPos.z}`
+              );
+              ghost.setAttribute(
+                'scale',
+                `${GHOST_SCALE} ${GHOST_SCALE} ${GHOST_SCALE}`
+              );
+
+              // Mark as ghost + make it selectable
+              ghost.setAttribute('data-is-ghost', 'true');
+              ghost.classList.add('selectable', 'clickable');
+              ghost.setAttribute('hover-highlight', '');
+
+              // Face roughly toward the camera
+              let rotY = 0;
+              const cameraEl = scene.camera && scene.camera.el;
+              if (cameraEl && cameraEl.object3D) {
+                const camPos = new THREE.Vector3();
+                cameraEl.object3D.getWorldPosition(camPos);
+                const dirToCamera = new THREE.Vector3().subVectors(camPos, worldPos);
+                rotY = THREE.MathUtils.radToDeg(Math.atan2(dirToCamera.x, dirToCamera.z));
+              } else {
+                const eulerFallback = new THREE.Euler().setFromQuaternion(worldQuat, 'YXZ');
+                rotY = THREE.MathUtils.radToDeg(eulerFallback.y);
+              }
+              ghost.setAttribute('rotation', `0 ${rotY} 0`);
+
+              // Endless random floating (within room bounds)
+              ghost.setAttribute(
+                'ghost-wander',
+                'radius: 2; minY: 0.5; maxY: 2.5; moveDuration: 4500'
+              );
+
+              (worldContainer || scene).appendChild(ghost);
+            },
+            { once: true }
+          );
+        }
+
       };
 
       if (roomEntity.hasLoaded) {
