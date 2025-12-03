@@ -225,7 +225,7 @@ AFRAME.registerComponent('ghost-wander', {
     this.el.setAttribute('animation__drag', {
       property: 'position',
       to: `${target.x} ${target.y} ${target.z}`,
-      dur: 4000,
+      dur: 5000,
       easing: 'easeInOutQuad'
     });
   },
