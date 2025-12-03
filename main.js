@@ -218,7 +218,7 @@ AFRAME.registerComponent('ghost-wander', {
     const camObj = cameraEl.object3D;
 
     // Target: very close in front of the camera
-    const target = new THREE.Vector3(0, 0, -0.1); // 10cm in front
+    const target = new THREE.Vector3(0, 0, -0.2); // 20cm in front
     camObj.localToWorld(target);
 
     // Slower drag: 3.5–4s feels dramatic
@@ -559,6 +559,7 @@ document.addEventListener('DOMContentLoaded', () => {
           const groupName = (groupNode.name || groupMeshes[0].name || '').toLowerCase();
           const isWall = groupName === 'wall' || groupName.includes('wall') || groupName === 'wall exterior';
           const isDoor = groupName === 'door' || groupName.includes('door') || groupName === 'door';
+          const isTable = groupName === 'table' || groupName.includes('table') || groupName === 'table';
 
           const partEl = document.createElement('a-entity');
 
@@ -616,7 +617,7 @@ document.addEventListener('DOMContentLoaded', () => {
           
           partEl.setObject3D('mesh', meshGroup);
 
-          if (!isWall && !isDoor) {
+          if (!isWall && !isDoor && !isTable) {
             // These are the interactive parts
             partEl.classList.add('selectable', 'clickable');
             partEl.setAttribute('hover-highlight', '');
