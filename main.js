@@ -271,7 +271,7 @@ AFRAME.registerComponent('ghost-wander', {
     const dist = this._ghostPos.distanceTo(this._camPos);
 
     // If ghost is within 20cm of the camera, treat as "reached player"
-    if (dist < 0.05) {
+    if (dist < 0.1) {
       this.isDragging = false;
       if (this.el.parentNode) {
         this.el.parentNode.removeChild(this.el);
@@ -558,6 +558,7 @@ document.addEventListener('DOMContentLoaded', () => {
           // Check if this group should be excluded (check first mesh name or group name)
           const groupName = (groupNode.name || groupMeshes[0].name || '').toLowerCase();
           const isWall = groupName === 'wall' || groupName.includes('wall') || groupName === 'wall exterior';
+          const isDoor = groupName === 'door' || groupName.includes('door') || groupName === 'door';
 
           const partEl = document.createElement('a-entity');
 
@@ -615,7 +616,7 @@ document.addEventListener('DOMContentLoaded', () => {
           
           partEl.setObject3D('mesh', meshGroup);
 
-          if (!isWall) {
+          if (!isWall && !isDoor) {
             // These are the interactive parts
             partEl.classList.add('selectable', 'clickable');
             partEl.setAttribute('hover-highlight', '');
