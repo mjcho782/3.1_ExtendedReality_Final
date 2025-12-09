@@ -9,12 +9,21 @@ window.__GHOST_CAPTURED__ = 0;
 window.__GHOST_TOTAL__ = 3;
 
 function updateGhostCounter() {
-  const el = document.getElementById('ghost-counter');
-  if (!el) return;
-
   const total = window.__GHOST_TOTAL__ || 3;
   const captured = window.__GHOST_CAPTURED__ || 0;
-  el.textContent = `Ghost Captured: ${captured}/${total}`;
+  const msg = `Ghost Captured: ${captured}/${total}`;
+
+  // HTML overlay (desktop)
+  const el = document.getElementById('ghost-counter');
+  if (el) {
+    el.textContent = msg;
+  }
+
+  // 3D text in VR
+  const el3d = document.getElementById('ghost-counter-3d');
+  if (el3d) {
+    el3d.setAttribute('text', 'value', msg);
+  }
 }
 /**
  * Hover highlight component (from old project, adapted)
@@ -392,14 +401,22 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
           const introPanel = document.getElementById('intro-panel');
           if (introPanel) introPanel.setAttribute('visible', 'false');
-
-          // Show the ghost counter HUD
+        
+          // Show the 2D ghost counter HUD (desktop)
           const counterEl = document.getElementById('ghost-counter');
           if (counterEl) {
             counterEl.style.display = 'block';
-            updateGhostCounter(); // ensure correct 0/3 or 0/numGhosts
           }
-        }
+        
+          // Show the 3D ghost counter HUD (VR)
+          const counter3d = document.getElementById('ghost-counter-3d');
+          if (counter3d) {
+            counter3d.setAttribute('visible', 'true');
+          }
+        
+          // Make sure both are displaying the right numbers
+          updateGhostCounter();
+        }        
       });
     }
 
