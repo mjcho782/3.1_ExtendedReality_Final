@@ -291,41 +291,25 @@ AFRAME.registerComponent('ghost-wander', {
       'position',
       `${this._ghostPos.x} ${this._ghostPos.y} ${this._ghostPos.z}`
     );
-    // adjust if too big / small
-    explosion.setAttribute('scale', '10 10 10');
-
-    // Our own tiny animation player (no aframe-extras needed)
+    explosion.setAttribute('scale', '1 1 1'); // adjust if needed
     explosion.setAttribute('explosion-anim', 'duration: 2000');
 
     const worldRoot = scene.querySelector('#world-root');
     (worldRoot || scene).appendChild(explosion);
 
     // Remove the ghost itself
-        // Remove the ghost itself
     if (this.el.parentNode) {
       this.el.parentNode.removeChild(this.el);
     }
 
-    // Update global ghost capture count + HUD
-        // Update global ghost capture count + HUD
+    // ✅ Update global ghost capture count + HUD
     window.__GHOST_CAPTURED__ = (window.__GHOST_CAPTURED__ || 0) + 1;
     if (typeof updateGhostCounter === 'function') {
       updateGhostCounter();
     }
 
-    // If all ghosts are captured, hide counters and show outro
+    // ✅ If all ghosts captured, trigger outro (which hides counters)
     if (window.__GHOST_CAPTURED__ >= window.__GHOST_TOTAL__) {
-      // Hide HTML counter
-      const counterEl = document.getElementById('ghost-counter');
-      if (counterEl) {
-        counterEl.style.display = 'none';
-      }
-      // Hide 3D counter
-      const counter3d = document.getElementById('ghost-counter-3d');
-      if (counter3d) {
-        counter3d.setAttribute('visible', 'false');
-      }
-      // Show outro panel if the function is defined
       if (typeof window.showOutroPanel === 'function') {
         window.showOutroPanel();
       }
@@ -465,6 +449,7 @@ document.addEventListener('DOMContentLoaded', () => {
     handlePinch(leftHand, 'left');
 
         /* ===== 1E. OUTRO PANEL (similar to intro) ===== */
+        // ===== OUTRO PANEL (similar to intro) =====
     const outroTextures = ['#outro1', '#outro2', '#outro3', '#outro4'];
     const outroPanel = document.getElementById('outro-panel');
     const outroImg = document.getElementById('outro-image-3d');
@@ -477,14 +462,29 @@ document.addEventListener('DOMContentLoaded', () => {
       outroImg.setAttribute('material', 'src', outroTextures[outroIndex]);
     }
 
-    // Expose a function so other code (ghost-wander) can trigger outro
-    window.showOutroPanel = function () {
+    function showOutroPanel() {
+      // Reset index + texture
       outroIndex = 0;
       updateOutroTexture();
+
+      // Hide HUD counters (2D + 3D)
+      const counterEl = document.getElementById('ghost-counter');
+      if (counterEl) {
+        counterEl.style.display = 'none';
+      }
+      const counter3d = document.getElementById('ghost-counter-3d');
+      if (counter3d) {
+        counter3d.setAttribute('visible', 'false');
+      }
+
+      // Show outro panel
       if (outroPanel) {
         outroPanel.setAttribute('visible', 'true');
       }
-    };
+    }
+
+    // Make it accessible from ghost-wander component
+    window.showOutroPanel = showOutroPanel;
 
     if (outroBtn) {
       outroBtn.addEventListener('click', () => {
@@ -493,13 +493,14 @@ document.addEventListener('DOMContentLoaded', () => {
           outroIndex++;
           updateOutroTexture();
         } else {
-          // Finished outro; just hide the panel
+          // Finished outro; hide the panel (you can add more logic here later)
           if (outroPanel) {
             outroPanel.setAttribute('visible', 'false');
           }
         }
       });
     }
+
 
 
     /* ===== 1C. AR SESSION OVERRIDE (from your new project) ===== */

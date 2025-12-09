@@ -71,9 +71,9 @@
         <img id="intro5" src="/images/intro5.png">
 
         <img id="outro1" src="/images/outro1.png">
-  <img id="outro2" src="/images/outro2.png">
-  <img id="outro3" src="/images/outro3.png">
-  <img id="outro4" src="/images/outro4.png">
+        <img id="outro2" src="/images/outro2.png">
+        <img id="outro3" src="/images/outro3.png">
+        <img id="outro4" src="/images/outro4.png">
 
         <!-- Room + ghost models (in /public) -->
         <a-asset-item id="room" src="/room.glb"></a-asset-item>
@@ -85,62 +85,63 @@
 
       <!-- Camera + cursor (ray from center; hits .clickable) -->
       <a-entity id="rig" position="0 0 0">
-          <a-camera position="0 1.6 0">
-            <a-entity
-              cursor="fuse: false"
-              raycaster="objects: .clickable; recursive: true"
-              position="0 0 -1"
-              geometry="primitive: ring; radiusInner: 0.01; radiusOuter: 0.015"
-              material="color: white; shader: flat">
-            </a-entity>
-
-            <a-entity
-              id="ghost-counter-3d"
-              position="-0.2 -0.5 -1"
-              text="value: Ghost Captured: 0/3; align: right; color: #FFFFFF; width: 1.8"
-              visible="false">
-            </a-entity>
-          </a-camera>
-          
-          <!-- Camera-relative intro panel (always centered in view) -->
-          <a-entity id="intro-panel" position="0 1.6 -1.5" rotation="0 0 0">
-            <a-plane
-              id="intro-image-3d"
-              width="1.8"
-              height="1.1"
-              material="src: #intro1; transparent: true; side: double">
-            </a-plane>
-
-            <a-plane
-              id="intro-button-3d"
-              class="clickable"
-              position="0 -0.9 0"
-              width="0.9"
-              height="0.3"
-              material="color: #2196F3"
-              text="value: Next; align: center; color: #FFFFFF; width: 2">
-            </a-plane>
+        <a-camera position="0 1.6 0">
+          <a-entity
+            cursor="fuse: false"
+            raycaster="objects: .clickable; recursive: true"
+            position="0 0 -1"
+            geometry="primitive: ring; radiusInner: 0.01; radiusOuter: 0.015"
+            material="color: white; shader: flat">
           </a-entity>
-
-          <a-entity id="outro-panel" position="0 1.6 -1.5" rotation="0 0 0" visible="false">
-            <a-plane
-              id="outro-image-3d"
-              width="1.8"
-              height="1.1"
-              material="src: #outro1; transparent: true; side: double">
-            </a-plane>
-        
-            <a-plane
-              id="outro-button-3d"
-              class="clickable"
-              position="0 -0.9 0"
-              width="0.9"
-              height="0.3"
-              material="color: #2196F3"
-              text="value: Next; align: center; color: #FFFFFF; width: 2">
-            </a-plane>
+      
+          <!-- 3D ghost counter in view -->
+          <a-entity
+            id="ghost-counter-3d"
+            position="-0.2 -0.5 -1"
+            text="value: Ghost Captured: 0/3; align: right; color: #FFFFFF; width: 1.8"
+            visible="false">
           </a-entity>
-      </a-entity>
+        </a-camera>
+      
+        <!-- Intro panel (already working) -->
+        <a-entity id="intro-panel" position="0 1.6 -1.5" rotation="0 0 0">
+          <a-plane
+            id="intro-image-3d"
+            width="1.8"
+            height="1.1"
+            material="src: #intro1; transparent: true; side: double">
+          </a-plane>
+      
+          <a-plane
+            id="intro-button-3d"
+            class="clickable"
+            position="0 -0.9 0"
+            width="0.9"
+            height="0.3"
+            material="color: #2196F3"
+            text="value: Next; align: center; color: #FFFFFF; width: 2">
+          </a-plane>
+        </a-entity>
+      
+        <a-entity id="outro-panel" position="0 1.6 -1.5" rotation="0 0 0" visible="false">
+          <a-plane
+            id="outro-image-3d"
+            width="1.8"
+            height="1.1"
+            material="src: #outro1; transparent: true; side: double">
+          </a-plane>
+      
+          <a-plane
+            id="outro-button-3d"
+            class="clickable"
+            position="0 -0.9 0"
+            width="0.9"
+            height="0.3"
+            material="color: #2196F3"
+            text="value: Next; align: center; color: #FFFFFF; width: 2">
+          </a-plane>
+        </a-entity>
+      </a-entity>      
 
     <!-- Hand tracking + raycasters to .clickable -->
     <!-- Hand tracking + raycasters to .clickable -->
