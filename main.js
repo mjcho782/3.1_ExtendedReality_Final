@@ -272,7 +272,7 @@ AFRAME.registerComponent('ghost-wander', {
       `${this._ghostPos.x} ${this._ghostPos.y} ${this._ghostPos.z}`
     );
     // adjust if too big / small
-    explosion.setAttribute('scale', '1 1 1');
+    explosion.setAttribute('scale', '10 10 10');
 
     // Our own tiny animation player (no aframe-extras needed)
     explosion.setAttribute('explosion-anim', 'duration: 2000');
