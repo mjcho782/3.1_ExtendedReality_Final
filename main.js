@@ -401,7 +401,7 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('Scene loaded');
 
     /* ===== 1A. INTRO PANEL (3D, kept) ===== */
-    const textures = ['#intro1', '#intro2', '#intro3', '#intro4', '#intro5'];
+    const textures = ['#intro1', '#intro2', '#intro3', '#intro4', '#intro5', '#intro6','#intro7','#intro8','#intro9','#intro10','#intro11',];
     const img = document.querySelector('#intro-image-3d');
     const btn = document.querySelector('#intro-button-3d');
 
