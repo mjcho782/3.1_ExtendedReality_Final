@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <title>Capture All The Ghosts • A-Frame</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    
+
     <script type="module" src="/main.js"></script>
     <!-- Basic page + scene styles -->
     <style>
@@ -34,6 +34,19 @@
         z-index: 9999;
       }
 
+      /* 👇 HUD counter at bottom-right */
+      #ghost-counter {
+        position: fixed;
+        right: 20px;
+        bottom: 20px;
+        padding: 6px 10px;
+        border-radius: 4px;
+        background: rgba(0, 0, 0, 0.4);
+        color: #ffffff;
+        font-size: 14px;
+        z-index: 10000;
+        display: none; /* hidden until intro is done */
+      }
     </style>
 
     <!-- Vite / bundler entry (imports 'aframe' inside main.js) -->
@@ -47,9 +60,6 @@
   webxr="referenceSpaceType: local-floor; requiredFeatures: local-floor; optionalFeatures: hand-tracking, hit-test"
   vr-mode-ui="enabled: true"
   two-hand-select-circle>
-
-
-
 
       <!-- Assets -->
       <a-assets>
@@ -134,5 +144,7 @@
       </a-entity>
     </a-entity>
     </a-scene>
+
+    <div id="ghost-counter">Ghost Captured: 0/3</div>
   </body>
 </html>

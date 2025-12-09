@@ -5,6 +5,17 @@ import 'aframe';
 const THREE = window.AFRAME && window.AFRAME.THREE ? window.AFRAME.THREE : window.THREE;
 const GHOST_SCALE = 0.5;
 
+window.__GHOST_CAPTURED__ = 0;
+window.__GHOST_TOTAL__ = 3;
+
+function updateGhostCounter() {
+  const el = document.getElementById('ghost-counter');
+  if (!el) return;
+
+  const total = window.__GHOST_TOTAL__ || 3;
+  const captured = window.__GHOST_CAPTURED__ || 0;
+  el.textContent = `Ghost Captured: ${captured}/${total}`;
+}
 /**
  * Hover highlight component (from old project, adapted)
  * Darkens an entity slightly when raycaster / cursor hovers over it.
@@ -281,8 +292,15 @@ AFRAME.registerComponent('ghost-wander', {
     (worldRoot || scene).appendChild(explosion);
 
     // Remove the ghost itself
+        // Remove the ghost itself
     if (this.el.parentNode) {
       this.el.parentNode.removeChild(this.el);
+    }
+
+    // Update global ghost capture count + HUD
+    window.__GHOST_CAPTURED__ = (window.__GHOST_CAPTURED__ || 0) + 1;
+    if (typeof updateGhostCounter === 'function') {
+      updateGhostCounter();
     }
 
     // Remove explosion after 2 seconds
@@ -291,6 +309,7 @@ AFRAME.registerComponent('ghost-wander', {
         explosion.parentNode.removeChild(explosion);
       }
     }, 2000);
+
   },
 
 
@@ -373,6 +392,13 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
           const introPanel = document.getElementById('intro-panel');
           if (introPanel) introPanel.setAttribute('visible', 'false');
+
+          // Show the ghost counter HUD
+          const counterEl = document.getElementById('ghost-counter');
+          if (counterEl) {
+            counterEl.style.display = 'block';
+            updateGhostCounter(); // ensure correct 0/3 or 0/numGhosts
+          }
         }
       });
     }
@@ -705,6 +731,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const shuffledParts = createdParts.slice().sort(() => Math.random() - 0.5);
         const numGhosts = Math.min(ghostModelIds.length, shuffledParts.length);
 
+        window.__GHOST_TOTAL__ = numGhosts;
+        window.__GHOST_CAPTURED__ = 0;
+        updateGhostCounter();
+
         for (let i = 0; i < numGhosts; i++) {
           const fakeEl = shuffledParts[i];
           const modelId = ghostModelIds[i];
@@ -774,7 +804,6 @@ document.addEventListener('DOMContentLoaded', () => {
             { once: true }
           );
         }
-
       };
 
       if (roomEntity.hasLoaded) {
