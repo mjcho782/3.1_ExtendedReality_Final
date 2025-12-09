@@ -7,13 +7,12 @@ const GHOST_SCALE = 0.5;
 
 /**
  * Hover highlight component (from old project, adapted)
- * Adds an emissive / lightened highlight when raycaster / cursor hovers over an entity.
+ * Darkens an entity slightly when raycaster / cursor hovers over it.
  */
 AFRAME.registerComponent('hover-highlight', {
   schema: {
-    color: { type: 'color', default: '#ffffaa' },
-    emissiveIntensity: { type: 'number', default: 0.45 },
-    lightenAmount: { type: 'number', default: 0.18 }
+    // Multiplicative factor for lightness; <1.0 darkens, >1.0 would lighten
+    darkenFactor: { type: 'number', default: 0.6 }
   },
   init() {
     this._onEnter = this.onEnter.bind(this);
@@ -38,6 +37,14 @@ AFRAME.registerComponent('hover-highlight', {
     if (obj.isMesh) toProcess.push(obj);
     else obj.traverse(c => { if (c.isMesh) toProcess.push(c); });
 
+    const darkenColor = color => {
+      if (!color || !color.getHSL) return;
+      const hsl = { h: 0, s: 0, l: 0 };
+      color.getHSL(hsl);
+      hsl.l = Math.max(0, Math.min(1, hsl.l * this.data.darkenFactor));
+      color.setHSL(hsl.h, hsl.s, hsl.l);
+    };
+
     toProcess.forEach(mesh => {
       if (!mesh.userData) mesh.userData = {};
       if (mesh.userData._hoverOriginalMaterial) return;
@@ -52,21 +59,21 @@ AFRAME.registerComponent('hover-highlight', {
         mesh.material = clonedArray;
         clonedArray.forEach(cm => {
           if (!cm) return;
+          if ('color' in cm) {
+            try { darkenColor(cm.color); } catch (e) {}
+          }
           if ('emissive' in cm) {
-            cm.emissive.set(this.data.color);
-            if ('emissiveIntensity' in cm) cm.emissiveIntensity = this.data.emissiveIntensity;
-          } else if ('color' in cm) {
-            try { cm.color.offsetHSL(0, 0, this.data.lightenAmount); } catch (e) {}
+            try { darkenColor(cm.emissive); } catch (e) {}
           }
         });
       } else {
         const cloned = cloneMat(origMat);
         mesh.material = cloned;
+        if (cloned && 'color' in cloned) {
+          try { darkenColor(cloned.color); } catch (e) {}
+        }
         if (cloned && 'emissive' in cloned) {
-          cloned.emissive.set(this.data.color);
-          if ('emissiveIntensity' in cloned) cloned.emissiveIntensity = this.data.emissiveIntensity;
-        } else if (cloned && 'color' in cloned) {
-          try { cloned.color.offsetHSL(0, 0, this.data.lightenAmount); } catch (e) {}
+          try { darkenColor(cloned.emissive); } catch (e) {}
         }
       }
     });
@@ -114,6 +121,7 @@ AFRAME.registerComponent('ghost-wander', {
     this._onDragComplete = this.onDragComplete.bind(this);
     this._onDragStart = this.startDrag.bind(this);
     this._onDragStop  = this.stopDrag.bind(this);
+    this.hasExploded = false;
 
     this.el.addEventListener('animationcomplete__move', this._onMoveComplete);
     this.el.addEventListener('animationcomplete__drag', this._onDragComplete);
@@ -242,15 +250,57 @@ AFRAME.registerComponent('ghost-wander', {
     this.scheduleNextMove();
   },
 
-  onDragComplete() {
-    // If drag completed while still dragging, "ghost reached the player" → disappear
-    if (!this.isDragging) return;
+  spawnExplosionAndRemoveGhost() {
+    // Prevent double-trigger
+    if (this.hasExploded) return;
+    this.hasExploded = true;
 
-    this.isDragging = false;
+    const scene = this.el.sceneEl;
+    if (!scene) {
+      if (this.el.parentNode) this.el.parentNode.removeChild(this.el);
+      return;
+    }
 
+    // Get ghost's world position
+    this.el.object3D.getWorldPosition(this._ghostPos);
+
+    // Create explosion entity
+    const explosion = document.createElement('a-entity');
+    explosion.setAttribute('gltf-model', '#explosion');
+    explosion.setAttribute(
+      'position',
+      `${this._ghostPos.x} ${this._ghostPos.y} ${this._ghostPos.z}`
+    );
+    explosion.setAttribute('scale', '0.6 0.6 0.6');
+
+    // Play all clips once & freeze on last frame (if needed)
+    explosion.setAttribute(
+      'animation-mixer',
+      'clip: *; loop: once; clampWhenFinished: true'
+    );
+
+    const worldRoot = scene.querySelector('#world-root');
+    (worldRoot || scene).appendChild(explosion);
+
+    // Remove the ghost itself
     if (this.el.parentNode) {
       this.el.parentNode.removeChild(this.el);
     }
+
+    // Remove explosion after 2 seconds
+    setTimeout(() => {
+      if (explosion.parentNode) {
+        explosion.parentNode.removeChild(explosion);
+      }
+    }, 2000);
+  },
+
+  onDragComplete() {
+    // If drag completed while still dragging, "ghost reached the player" → explode + disappear
+    if (!this.isDragging) return;
+
+    this.isDragging = false;
+    this.spawnExplosionAndRemoveGhost();
   },
 
   // EXTRA SAFETY: if the ghost gets very close to the camera while dragging,
@@ -270,13 +320,11 @@ AFRAME.registerComponent('ghost-wander', {
 
     const dist = this._ghostPos.distanceTo(this._camPos);
 
-    // If ghost is within 20cm of the camera, treat as "reached player"
-    if (dist < 0.1) {
-      this.isDragging = false;
-      if (this.el.parentNode) {
-        this.el.parentNode.removeChild(this.el);
-      }
-    }
+        // If ghost is within 10cm of the camera, treat as "reached player"
+      if (dist < 0.1) {
+        this.isDragging = false;
+        this.spawnExplosionAndRemoveGhost();
+      }    
   }
 });
 
