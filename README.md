@@ -1,4 +1,5 @@
-# 3.1_ExtendedReality_Final
+#Capture All The Ghosts
+## 3.1_ExtendedReality_Final
 
 A-Frame VR project with Vite build tool.
 
