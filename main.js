@@ -321,7 +321,7 @@ AFRAME.registerComponent('ghost-wander', {
     const dist = this._ghostPos.distanceTo(this._camPos);
 
         // If ghost is within 10cm of the camera, treat as "reached player"
-      if (dist < 0.1) {
+      if (dist < 0.2) {
         this.isDragging = false;
         this.spawnExplosionAndRemoveGhost();
       }    
