@@ -254,16 +254,16 @@ AFRAME.registerComponent('ghost-wander', {
     // Prevent double-trigger
     if (this.hasExploded) return;
     this.hasExploded = true;
-  
+
     const scene = this.el.sceneEl;
     if (!scene) {
       if (this.el.parentNode) this.el.parentNode.removeChild(this.el);
       return;
     }
-  
+
     // Get ghost's world position
     this.el.object3D.getWorldPosition(this._ghostPos);
-  
+
     // Create explosion entity
     const explosion = document.createElement('a-entity');
     explosion.setAttribute('gltf-model', '#explosion');
@@ -271,25 +271,20 @@ AFRAME.registerComponent('ghost-wander', {
       'position',
       `${this._ghostPos.x} ${this._ghostPos.y} ${this._ghostPos.z}`
     );
-    explosion.setAttribute('scale', '100 100 100');
-  
-    // When model is ready, start playing all animation clips once
-    explosion.addEventListener('model-loaded', () => {
-      // If your GLB has a single animation, clip: * will play it.
-      explosion.setAttribute(
-        'animation-mixer',
-        'clip: *; loop: once; clampWhenFinished: true'
-      );
-    });
-  
+    // adjust if too big / small
+    explosion.setAttribute('scale', '1 1 1');
+
+    // Our own tiny animation player (no aframe-extras needed)
+    explosion.setAttribute('explosion-anim', 'duration: 2000');
+
     const worldRoot = scene.querySelector('#world-root');
     (worldRoot || scene).appendChild(explosion);
-  
-    // Remove the ghost itself immediately
+
+    // Remove the ghost itself
     if (this.el.parentNode) {
       this.el.parentNode.removeChild(this.el);
     }
-  
+
     // Remove explosion after 2 seconds
     setTimeout(() => {
       if (explosion.parentNode) {
@@ -297,7 +292,7 @@ AFRAME.registerComponent('ghost-wander', {
       }
     }, 2000);
   },
-  
+
 
   onDragComplete() {
     // If drag completed while still dragging, "ghost reached the player" → explode + disappear
@@ -802,10 +797,68 @@ document.addEventListener('DOMContentLoaded', () => {
 
 });
 
-// ===============================
-// Two-hand select with center glow + ghost dragging
-// ===============================
-// ===============================
+AFRAME.registerComponent('explosion-anim', {
+  schema: {
+    // How long (ms) we care about updating the animation.
+    // The entity itself will be removed by ghost-wander's timeout.
+    duration: { type: 'number', default: 2000 }
+  },
+
+  init() {
+    this.mixer = null;
+    this.action = null;
+    this.elapsed = 0;
+
+    this._onModelLoaded = this.onModelLoaded.bind(this);
+    this.el.addEventListener('model-loaded', this._onModelLoaded);
+  },
+
+  remove() {
+    this.el.removeEventListener('model-loaded', this._onModelLoaded);
+    if (this.mixer) {
+      // Optional clean-up
+      try { this.mixer.stopAllAction(); } catch (e) {}
+      this.mixer = null;
+    }
+  },
+
+  onModelLoaded(evt) {
+    const root = this.el.getObject3D('mesh');
+    if (!root) {
+      console.warn('[explosion-anim] No mesh on model-loaded.');
+      return;
+    }
+
+    const clips = root.animations || evt.detail.model && evt.detail.model.animations;
+    if (!clips || !clips.length) {
+      console.warn('[explosion-anim] No animations found on explosion GLB.');
+      return;
+    }
+
+    // Use the first animation clip – adjust if your GLB has multiple
+    const clip = clips[0];
+
+    this.mixer = new THREE.AnimationMixer(root);
+    this.action = this.mixer.clipAction(clip);
+    this.action.setLoop(THREE.LoopOnce, 1);
+    this.action.clampWhenFinished = true;
+    this.action.play();
+  },
+
+  tick(time, timeDelta) {
+    if (!this.mixer) return;
+
+    const dt = (timeDelta || 0) / 1000;
+    this.mixer.update(dt);
+
+    this.elapsed += (timeDelta || 0);
+    if (this.elapsed >= this.data.duration) {
+      // We can stop updating; the entity will be removed by the timeout
+      // Optionally: this.mixer.stopAllAction();
+    }
+  }
+});
+
 // Two-hand select with center glow + latched ghost dragging
 // ===============================
 AFRAME.registerComponent('two-hand-select-circle', {
