@@ -271,7 +271,7 @@ AFRAME.registerComponent('ghost-wander', {
       'position',
       `${this._ghostPos.x} ${this._ghostPos.y} ${this._ghostPos.z}`
     );
-    explosion.setAttribute('scale', '0.6 0.6 0.6');
+    explosion.setAttribute('scale', '10 10 10');
 
     // Play all clips once & freeze on last frame (if needed)
     explosion.setAttribute(
@@ -321,7 +321,7 @@ AFRAME.registerComponent('ghost-wander', {
     const dist = this._ghostPos.distanceTo(this._camPos);
 
         // If ghost is within 10cm of the camera, treat as "reached player"
-      if (dist < 0.2) {
+      if (dist < 0.3) {
         this.isDragging = false;
         this.spawnExplosionAndRemoveGhost();
       }    
