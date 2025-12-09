@@ -307,9 +307,28 @@ AFRAME.registerComponent('ghost-wander', {
     }
 
     // Update global ghost capture count + HUD
+        // Update global ghost capture count + HUD
     window.__GHOST_CAPTURED__ = (window.__GHOST_CAPTURED__ || 0) + 1;
     if (typeof updateGhostCounter === 'function') {
       updateGhostCounter();
+    }
+
+    // If all ghosts are captured, hide counters and show outro
+    if (window.__GHOST_CAPTURED__ >= window.__GHOST_TOTAL__) {
+      // Hide HTML counter
+      const counterEl = document.getElementById('ghost-counter');
+      if (counterEl) {
+        counterEl.style.display = 'none';
+      }
+      // Hide 3D counter
+      const counter3d = document.getElementById('ghost-counter-3d');
+      if (counter3d) {
+        counter3d.setAttribute('visible', 'false');
+      }
+      // Show outro panel if the function is defined
+      if (typeof window.showOutroPanel === 'function') {
+        window.showOutroPanel();
+      }
     }
 
     // Remove explosion after 2 seconds
@@ -318,7 +337,6 @@ AFRAME.registerComponent('ghost-wander', {
         explosion.parentNode.removeChild(explosion);
       }
     }, 2000);
-
   },
 
 
@@ -370,7 +388,7 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('Scene loaded');
 
     /* ===== 1A. INTRO PANEL (3D, kept) ===== */
-    const textures = ['#intro1', '#intro2', '#intro3', '#intro4'];
+    const textures = ['#intro1', '#intro2', '#intro3', '#intro4', '#intro5'];
     const img = document.querySelector('#intro-image-3d');
     const btn = document.querySelector('#intro-button-3d');
 
@@ -445,6 +463,44 @@ document.addEventListener('DOMContentLoaded', () => {
 
     handlePinch(rightHand, 'right');
     handlePinch(leftHand, 'left');
+
+        /* ===== 1E. OUTRO PANEL (similar to intro) ===== */
+    const outroTextures = ['#outro1', '#outro2', '#outro3', '#outro4'];
+    const outroPanel = document.getElementById('outro-panel');
+    const outroImg = document.getElementById('outro-image-3d');
+    const outroBtn = document.getElementById('outro-button-3d');
+
+    let outroIndex = 0;
+
+    function updateOutroTexture() {
+      if (!outroImg) return;
+      outroImg.setAttribute('material', 'src', outroTextures[outroIndex]);
+    }
+
+    // Expose a function so other code (ghost-wander) can trigger outro
+    window.showOutroPanel = function () {
+      outroIndex = 0;
+      updateOutroTexture();
+      if (outroPanel) {
+        outroPanel.setAttribute('visible', 'true');
+      }
+    };
+
+    if (outroBtn) {
+      outroBtn.addEventListener('click', () => {
+        // Step through outro images, then hide panel
+        if (outroIndex < outroTextures.length - 1) {
+          outroIndex++;
+          updateOutroTexture();
+        } else {
+          // Finished outro; just hide the panel
+          if (outroPanel) {
+            outroPanel.setAttribute('visible', 'false');
+          }
+        }
+      });
+    }
+
 
     /* ===== 1C. AR SESSION OVERRIDE (from your new project) ===== */
     if (!('xr' in navigator)) {

@@ -68,6 +68,12 @@
         <img id="intro2" src="/images/intro2.png">
         <img id="intro3" src="/images/intro3.png">
         <img id="intro4" src="/images/intro4.png">
+        <img id="intro5" src="/images/intro5.png">
+
+        <img id="outro1" src="/images/outro1.png">
+  <img id="outro2" src="/images/outro2.png">
+  <img id="outro3" src="/images/outro3.png">
+  <img id="outro4" src="/images/outro4.png">
 
         <!-- Room + ghost models (in /public) -->
         <a-asset-item id="room" src="/room.glb"></a-asset-item>
@@ -107,6 +113,25 @@
 
             <a-plane
               id="intro-button-3d"
+              class="clickable"
+              position="0 -0.9 0"
+              width="0.9"
+              height="0.3"
+              material="color: #2196F3"
+              text="value: Next; align: center; color: #FFFFFF; width: 2">
+            </a-plane>
+          </a-entity>
+
+          <a-entity id="outro-panel" position="0 1.6 -1.5" rotation="0 0 0" visible="false">
+            <a-plane
+              id="outro-image-3d"
+              width="1.8"
+              height="1.1"
+              material="src: #outro1; transparent: true; side: double">
+            </a-plane>
+        
+            <a-plane
+              id="outro-button-3d"
               class="clickable"
               position="0 -0.9 0"
               width="0.9"
