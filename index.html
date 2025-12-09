@@ -71,9 +71,6 @@
         <img id="intro5" src="/images/intro5.png">
 
         <img id="outro1" src="/images/outro1.png">
-        <img id="outro2" src="/images/outro2.png">
-        <img id="outro3" src="/images/outro3.png">
-        <img id="outro4" src="/images/outro4.png">
 
         <!-- Room + ghost models (in /public) -->
         <a-asset-item id="room" src="/room.glb"></a-asset-item>
@@ -81,7 +78,23 @@
         <a-asset-item id="ghost2" src="/ghost2.glb"></a-asset-item>
         <a-asset-item id="ghost3" src="/ghost3.glb"></a-asset-item>
         <a-asset-item id="explosion" src="/explosion.glb"></a-asset-item>
+
+        <audio id="bgm" src="/music.mp3"></audio>
+        <audio id="select-sfx-audio" src="/select.mp3"></audio>
+        <audio id="alert-sfx-audio" src="/alert.mp3"></audio>
+
       </a-assets>
+
+      <a-entity sound="src: #bgm; autoplay: true; loop: true; volume: 0.5; positional: false"></a-entity>
+      <a-entity
+        id="select-sfx"
+        sound="src: #select-sfx-audio; poolSize: 8; positional: false; volume: 0.5">
+      </a-entity>
+      <a-entity
+        id="alert-sfx"
+        sound="src: #alert-sfx-audio; poolSize: 6; positional: false; volume: 1.0">
+      </a-entity>
+
 
       <!-- Camera + cursor (ray from center; hits .clickable) -->
       <a-entity id="rig" position="0 0 0">
@@ -129,16 +142,6 @@
             width="1.8"
             height="1.1"
             material="src: #outro1; transparent: true; side: double">
-          </a-plane>
-      
-          <a-plane
-            id="outro-button-3d"
-            class="clickable"
-            position="0 -0.9 0"
-            width="0.9"
-            height="0.3"
-            material="color: #2196F3"
-            text="value: Next; align: center; color: #FFFFFF; width: 2">
           </a-plane>
         </a-entity>
       </a-entity>      

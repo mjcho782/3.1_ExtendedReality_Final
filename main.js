@@ -25,6 +25,33 @@ function updateGhostCounter() {
     el3d.setAttribute('text', 'value', msg);
   }
 }
+
+function playSelectSfx() {
+  const sfxEl = document.getElementById('select-sfx');
+  if (!sfxEl || !sfxEl.components || !sfxEl.components.sound) return;
+
+  // Restart the sound every time so rapid clicks feel responsive
+  try {
+    sfxEl.components.sound.stopSound();
+    sfxEl.components.sound.playSound();
+  } catch (e) {
+    console.warn('Could not play select sfx:', e);
+  }
+}
+
+function playAlertSfx() {
+  const sfxEl = document.getElementById('alert-sfx');
+  if (!sfxEl || !sfxEl.components || !sfxEl.components.sound) return;
+
+  try {
+    sfxEl.components.sound.stopSound();
+    sfxEl.components.sound.playSound();
+  } catch (e) {
+    console.warn("Could not play alert sfx:", e);
+  }
+}
+
+
 /**
  * Hover highlight component (from old project, adapted)
  * Darkens an entity slightly when raycaster / cursor hovers over it.
@@ -291,7 +318,7 @@ AFRAME.registerComponent('ghost-wander', {
       'position',
       `${this._ghostPos.x} ${this._ghostPos.y} ${this._ghostPos.z}`
     );
-    explosion.setAttribute('scale', '1 1 1'); // adjust if needed
+    explosion.setAttribute('scale', '10 10 10'); // adjust if needed
     explosion.setAttribute('explosion-anim', 'duration: 2000');
 
     const worldRoot = scene.querySelector('#world-root');
@@ -301,6 +328,8 @@ AFRAME.registerComponent('ghost-wander', {
     if (this.el.parentNode) {
       this.el.parentNode.removeChild(this.el);
     }
+
+    playAlertSfx();
 
     // ✅ Update global ghost capture count + HUD
     window.__GHOST_CAPTURED__ = (window.__GHOST_CAPTURED__ || 0) + 1;
@@ -874,6 +903,8 @@ document.addEventListener('DOMContentLoaded', () => {
               );
 
               (worldContainer || scene).appendChild(ghost);
+
+              playAlertSfx();
             },
             { once: true }
           );
@@ -896,6 +927,15 @@ document.addEventListener('DOMContentLoaded', () => {
         );
       }
     }
+
+    scene.addEventListener('click', (evt) => {
+      const target = evt.target;
+      if (!target || !target.classList) return;
+
+      if (target.classList.contains('clickable')) {
+        playSelectSfx();
+      }
+    });
   });
 
 });
