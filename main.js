@@ -254,16 +254,16 @@ AFRAME.registerComponent('ghost-wander', {
     // Prevent double-trigger
     if (this.hasExploded) return;
     this.hasExploded = true;
-
+  
     const scene = this.el.sceneEl;
     if (!scene) {
       if (this.el.parentNode) this.el.parentNode.removeChild(this.el);
       return;
     }
-
+  
     // Get ghost's world position
     this.el.object3D.getWorldPosition(this._ghostPos);
-
+  
     // Create explosion entity
     const explosion = document.createElement('a-entity');
     explosion.setAttribute('gltf-model', '#explosion');
@@ -272,21 +272,24 @@ AFRAME.registerComponent('ghost-wander', {
       `${this._ghostPos.x} ${this._ghostPos.y} ${this._ghostPos.z}`
     );
     explosion.setAttribute('scale', '100 100 100');
-
-    // Play all clips once & freeze on last frame (if needed)
-    explosion.setAttribute(
-      'animation-mixer',
-      'clip: *; loop: once; clampWhenFinished: true'
-    );
-
+  
+    // When model is ready, start playing all animation clips once
+    explosion.addEventListener('model-loaded', () => {
+      // If your GLB has a single animation, clip: * will play it.
+      explosion.setAttribute(
+        'animation-mixer',
+        'clip: *; loop: once; clampWhenFinished: true'
+      );
+    });
+  
     const worldRoot = scene.querySelector('#world-root');
     (worldRoot || scene).appendChild(explosion);
-
-    // Remove the ghost itself
+  
+    // Remove the ghost itself immediately
     if (this.el.parentNode) {
       this.el.parentNode.removeChild(this.el);
     }
-
+  
     // Remove explosion after 2 seconds
     setTimeout(() => {
       if (explosion.parentNode) {
@@ -294,6 +297,7 @@ AFRAME.registerComponent('ghost-wander', {
       }
     }, 2000);
   },
+  
 
   onDragComplete() {
     // If drag completed while still dragging, "ghost reached the player" → explode + disappear
